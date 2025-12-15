@@ -6,12 +6,12 @@ export type TimerActionPayload =
   | { type: 'START'; endTimestamp: number; duration: number }
   | { type: 'STOP'; timeLeft: number }
   | { type: 'RESET'; duration: number }
-  | { type: 'UPDATE_DURATION'; duration: number }; // Added to sync input changes
+  | { type: 'UPDATE_DURATION'; duration: number };
 
 export type StateActionPayload = {
   members: Member[];
   rounds: Round[];
-  timestamp: number; // Para resolver conflictos (last write wins)
+  timestamp: number;
 };
 
 // Singleton para mantener la conexión
@@ -22,14 +22,13 @@ const APP_ID = 'speedback_rotation_v1_app';
 
 export const connectP2P = (roomId: string) => {
   if (roomInstance) {
-    // Si ya estamos conectados a esta sala, no hacer nada
     return actions;
   }
 
-  // Conectar a la sala P2P (usa torrent/tracker público para handshake)
-  const room = joinRoom({ appId: APP_ID }, roomId);
+  // Conectar usando estrategia MQTT (definida en importmap)
+  const config = { appId: APP_ID };
+  const room = joinRoom(config, roomId);
   
-  // Crear canales de datos
   const [sendState, onState] = room.makeAction<StateActionPayload>('syncState');
   const [sendTimer, onTimer] = room.makeAction<TimerActionPayload>('syncTimer');
 

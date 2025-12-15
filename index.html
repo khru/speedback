@@ -7,9 +7,9 @@
     <title>Speedback - Feedback Rotativo</title>
     
     <!-- PWA -->
-    <link rel="manifest" href="./manifest.json">
-    <link rel="icon" href="./icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="./icon.svg">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.svg">
     
     <!-- Performance Optimizations -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,7 +49,7 @@
     "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "trystero": "https://esm.sh/trystero@0.19.0"
+    "trystero": "https://esm.sh/trystero@0.19.0/mqtt"
   }
 }
 </script>
@@ -63,7 +63,7 @@
     <script>
       if ('serviceWorker' in navigator && !window.location.host.includes('stackblitz')) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
+          navigator.serviceWorker.register('/sw.js')
             .then(registration => console.log('SW Registered'))
             .catch(error => console.log('SW Registration Failed:', error));
         });

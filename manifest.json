@@ -8,7 +8,7 @@
   "description": "Herramienta profesional para sesiones de feedback rotativo.",
   "icons": [
     {
-      "src": "./icon.svg",
+      "src": "/icon.svg",
       "type": "image/svg+xml",
       "sizes": "512x512"
     }
