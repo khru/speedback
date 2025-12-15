@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Menu, Zap, Globe, LogOut, BookOpen, FileText, Table2, X } from 'lucide-react';
+import { Sparkles, Menu, Zap, Globe, BookOpen, FileText, Table2, X } from 'lucide-react';
 
 import { MemberInput } from './components/MemberInput';
 import { MemberList } from './components/MemberList';
@@ -9,13 +9,12 @@ import { ConfirmModal } from './components/ConfirmModal';
 import { RecommendationsModal } from './components/RecommendationsModal';
 import { SoundMenu } from './components/SoundMenu';
 import { generateRotationSchedule } from './services/rotationService';
-import { connectP2P, disconnectP2P, StateActionPayload } from './services/p2p';
 import { Member, Round, Language, SoundMode } from './types';
 import { t } from './constants/translations';
 
 // Simple UUID generator fallback
 const generateId = () => Math.random().toString(36).substr(2, 9);
-const DEFAULT_ROOM = 'Local Session';
+const STORAGE_KEY = 'speedback_local_session_v1';
 
 function App() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -29,21 +28,9 @@ function App() {
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
-  // --- Synchronization Logic (BroadcastChannel) ---
+  // Load initial state from LocalStorage
   useEffect(() => {
-    // Connect to Sync Channel immediately
-    const sync = connectP2P(DEFAULT_ROOM);
-
-    // 1. Listen for State Updates (Members & Rounds)
-    sync.onState((data: StateActionPayload) => {
-      // Simple merge strategy: if remote timestamp is newer (or different), update.
-      // For local broadcast, we just trust the message.
-      setMembers(data.members);
-      setRounds(data.rounds);
-    });
-
-    // Load initial state from LocalStorage
-    const saved = localStorage.getItem(`speedback_room_${DEFAULT_ROOM}`);
+    const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -53,28 +40,12 @@ function App() {
         console.error("Failed to load local data", e);
       }
     }
-
-    return () => {
-      disconnectP2P();
-    };
   }, []);
-
-  // Helper to Broadcast Changes
-  const broadcastState = (newMembers: Member[], newRounds: Round[]) => {
-    const sync = connectP2P(DEFAULT_ROOM);
-    if (sync) {
-      sync.sendState({
-        members: newMembers,
-        rounds: newRounds,
-        timestamp: Date.now()
-      });
-    }
-  };
 
   // Save to local storage on change
   useEffect(() => {
     const data = { members, rounds };
-    localStorage.setItem(`speedback_room_${DEFAULT_ROOM}`, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [members, rounds]);
 
   // --- Actions ---
@@ -83,28 +54,20 @@ function App() {
     const cleanName = name.trim();
     if (!cleanName) return;
     
-    let updatedMembers: Member[] = [];
-    
     setMembers(prevMembers => {
       if (prevMembers.some(m => m.name.toLowerCase() === cleanName.toLowerCase())) {
-        updatedMembers = prevMembers;
         return prevMembers;
       }
-      updatedMembers = [...prevMembers, { id: generateId(), name: cleanName }];
-      return updatedMembers;
+      return [...prevMembers, { id: generateId(), name: cleanName }];
     });
 
-    setTimeout(() => {
-        setRounds([]); 
-        broadcastState(updatedMembers, []);
-    }, 0);
+    // Reset rounds when adding members to ensure consistency
+    setRounds([]); 
   };
 
   const removeMember = (id: string) => {
-    const newMembers = members.filter(m => m.id !== id);
-    setMembers(newMembers);
+    setMembers(prev => prev.filter(m => m.id !== id));
     setRounds([]);
-    broadcastState(newMembers, []);
   };
 
   const openClearModal = () => {
@@ -115,13 +78,11 @@ function App() {
     setMembers([]);
     setRounds([]);
     setIsClearModalOpen(false);
-    broadcastState([], []);
   };
 
   const handleGenerate = () => {
     const generatedRounds = generateRotationSchedule(members);
     setRounds(generatedRounds);
-    broadcastState(members, generatedRounds);
     // On mobile, close menu after generating to show results
     setIsMobileMenuOpen(false);
   };
@@ -268,7 +229,6 @@ function App() {
            <div>
              <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
                Session
-               <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full uppercase tracking-wider border border-violet-100">Live Sync</span>
              </h2>
            </div>
 
@@ -345,7 +305,6 @@ function App() {
                 onDurationChange={setSessionDurationMinutes}
                 lang={lang} 
                 soundMode={soundMode}
-                roomName={DEFAULT_ROOM}
               />
             </section>
 

@@ -2,17 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Timer as TimerIcon, Mic, RefreshCw, AlertCircle } from 'lucide-react';
 import { Language, SoundMode } from '../types';
 import { t } from '../constants/translations';
-import { getP2P, TimerActionPayload } from '../services/p2p';
 
 interface TimerProps {
   duration: number;
   onDurationChange: (minutes: number) => void;
   lang: Language;
   soundMode: SoundMode;
-  roomName: string | null;
 }
 
-export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, soundMode, roomName }) => {
+export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, soundMode }) => {
   const [timeLeft, setTimeLeft] = useState(duration * 60);
   const [totalTime, setTotalTime] = useState(duration * 60);
   const [isRunning, setIsRunning] = useState(false);
@@ -24,11 +22,10 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   const audioSwitchRef = useRef<HTMLAudioElement | null>(null);
   const audioWarnRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<number | null>(null);
-  const endTimeRef = useRef<number | null>(null);
   const notifiedSwitchRef = useRef(false);
   const notifiedWarnRef = useRef(false);
 
-  // Sync state ONLY when duration changes manually (local or via sync prop update)
+  // Sync state ONLY when duration changes manually
   useEffect(() => {
     if (prevDurationRef.current !== duration) {
       setTotalTime(duration * 60);
@@ -37,44 +34,6 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
       prevDurationRef.current = duration;
     }
   }, [duration]);
-
-  // Hook into Sync Service
-  useEffect(() => {
-    if (!roomName) return;
-    const sync = getP2P();
-    if (!sync) return;
-
-    // Listener for sync timer events
-    sync.onTimer((data: TimerActionPayload) => {
-      if (data.type === 'START') {
-        const { endTimestamp, duration: remoteDuration } = data;
-        endTimeRef.current = endTimestamp;
-        setTotalTime(remoteDuration);
-        setIsRunning(true);
-        // Calculate remaining immediately
-        const remaining = Math.max(0, Math.ceil((endTimestamp - Date.now()) / 1000));
-        setTimeLeft(remaining);
-        resetNotificationRefs();
-      } else if (data.type === 'STOP') {
-        setIsRunning(false);
-        endTimeRef.current = null;
-        // Sync pause time from peer to avoid drift
-        if (data.timeLeft !== undefined) {
-            setTimeLeft(data.timeLeft);
-        }
-      } else if (data.type === 'RESET') {
-        setIsRunning(false);
-        endTimeRef.current = null;
-        setTotalTime(data.duration);
-        setTimeLeft(data.duration);
-        resetNotificationRefs();
-      } else if (data.type === 'UPDATE_DURATION') {
-        // Update parent state, which triggers the useEffect above to update local visuals
-        onDurationChange(data.duration);
-      }
-    });
-
-  }, [roomName, onDurationChange]);
 
   useEffect(() => {
     audioEndRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -118,33 +77,26 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = window.setInterval(() => {
-        if (endTimeRef.current) {
-          const now = Date.now();
-          const remaining = Math.ceil((endTimeRef.current - now) / 1000);
+        setTimeLeft((prev) => {
+          const now = prev - 1;
           const halfTime = Math.ceil(totalTime / 2);
-          
-          if (remaining === halfTime + 10 && !notifiedWarnRef.current) {
-             triggerNotification(t(lang, 'timer.warnTitle'), t(lang, 'timer.warnBody'), 'warn');
-             notifiedWarnRef.current = true;
+
+          if (now === halfTime + 10 && !notifiedWarnRef.current) {
+            triggerNotification(t(lang, 'timer.warnTitle'), t(lang, 'timer.warnBody'), 'warn');
+            notifiedWarnRef.current = true;
           }
 
-          if (remaining === halfTime && !notifiedSwitchRef.current) {
-             triggerNotification(t(lang, 'timer.switchTitle'), t(lang, 'timer.switchBody'), 'switch');
-             notifiedSwitchRef.current = true;
+          if (now === halfTime && !notifiedSwitchRef.current) {
+            triggerNotification(t(lang, 'timer.switchTitle'), t(lang, 'timer.switchBody'), 'switch');
+            notifiedSwitchRef.current = true;
           }
 
-          if (remaining <= 0) handleComplete();
-          else setTimeLeft(remaining);
-        } else {
-          // Fallback if endTime not set
-          setTimeLeft((prev) => {
-            if (prev <= 1) {
-              handleComplete();
-              return 0;
-            }
-            return prev - 1;
-          });
-        }
+          if (now <= 0) {
+            handleComplete();
+            return 0;
+          }
+          return now;
+        });
       }, 1000);
     } else {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
@@ -156,21 +108,10 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     setTimeLeft(0);
     setIsRunning(false);
     if (intervalRef.current) window.clearInterval(intervalRef.current);
-    endTimeRef.current = null;
     triggerNotification(t(lang, 'timer.notificationTitle'), t(lang, 'timer.notificationBody'), 'end');
   };
 
-  const broadcast = (payload: TimerActionPayload) => {
-    const sync = getP2P();
-    if (sync) {
-      sync.sendTimer(payload);
-    }
-  };
-
   const handleStart = () => {
-    const now = Date.now();
-    const endTimestamp = now + (timeLeft * 1000);
-    endTimeRef.current = endTimestamp;
     resetNotificationRefs();
     setIsRunning(true);
     
@@ -178,23 +119,10 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     const halfTime = Math.ceil(totalTime / 2);
     if (remaining < halfTime + 10) notifiedWarnRef.current = true;
     if (remaining < halfTime) notifiedSwitchRef.current = true;
-
-    // Send Broadcast
-    broadcast({ type: 'START', endTimestamp, duration: totalTime });
   };
 
   const handlePause = () => {
     setIsRunning(false);
-    
-    // Calculate exact timeLeft
-    let currentRemaining = timeLeft;
-    if (endTimeRef.current) {
-        currentRemaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
-        setTimeLeft(currentRemaining);
-    }
-    
-    endTimeRef.current = null;
-    broadcast({ type: 'STOP', timeLeft: currentRemaining });
   };
 
   const handleReset = () => {
@@ -202,16 +130,13 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     setIsRunning(false);
     setTotalTime(newDuration);
     setTimeLeft(newDuration);
-    endTimeRef.current = null;
     resetNotificationRefs();
-    broadcast({ type: 'RESET', duration: newDuration });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value);
     if (!isNaN(val) && val > 0) {
       onDurationChange(val);
-      broadcast({ type: 'UPDATE_DURATION', duration: val });
     }
   };
 
