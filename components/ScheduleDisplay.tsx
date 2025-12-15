@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Layers, Coffee, CheckCircle2, ArrowRightLeft, ChevronDown, Clock, Timer, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Layers, Coffee, CheckCircle2, ArrowRightLeft, ChevronDown, ChevronUp, Clock, Timer, Check, Circle } from 'lucide-react';
 import { Round, Language, Member, Pair } from '../types';
 import { t } from '../constants/translations';
 import { Avatar } from './Avatar';
@@ -12,22 +12,45 @@ interface ScheduleDisplayProps {
 
 export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, roundDurationMinutes }) => {
   const [completedRounds, setCompletedRounds] = useState<Set<number>>(new Set());
+  // Track manually expanded rounds (separate from completion status)
+  const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
 
-  if (rounds.length === 0) return null;
-
+  // Auto-expand current round logic
+  const currentRoundIndex = rounds.findIndex(r => !completedRounds.has(r.roundNumber));
+  
   const toggleRoundCompletion = (roundNum: number) => {
     setCompletedRounds(prev => {
       const next = new Set(prev);
       if (next.has(roundNum)) {
         next.delete(roundNum);
+        // When reopening, ensure it's expanded
+        setExpandedRounds(prevExp => new Set(prevExp).add(roundNum));
       } else {
         next.add(roundNum);
+        // When completing, we generally want to collapse it, 
+        // but we remove it from manual expanded list to let default logic take over
+        setExpandedRounds(prevExp => {
+            const newExp = new Set(prevExp);
+            newExp.delete(roundNum);
+            return newExp;
+        });
       }
       return next;
     });
   };
 
-  const currentRoundIndex = rounds.findIndex(r => !completedRounds.has(r.roundNumber));
+  const toggleExpand = (roundNum: number) => {
+     setExpandedRounds(prev => {
+         const next = new Set(prev);
+         if (next.has(roundNum)) {
+             next.delete(roundNum);
+         } else {
+             next.add(roundNum);
+         }
+         return next;
+     });
+  };
+
   const progressPercentage = Math.round((completedRounds.size / rounds.length) * 100);
 
   // --- Time Calculations (Silent) ---
@@ -100,61 +123,74 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
                const isCompleted = completedRounds.has(round.roundNumber);
                const isCurrent = currentRoundIndex === index;
                
+               // Logic: Open if it's the current active round OR if manually expanded
+               // But if it's completed, it's closed by default unless manually expanded
+               const isExpanded = expandedRounds.has(round.roundNumber) || (isCurrent && !isCompleted);
+               
                return (
                   <div key={round.roundNumber} className={`relative pl-16 transition-all duration-500 group`}>
                       
-                      {/* Round Number Node */}
-                      <button 
-                        onClick={() => toggleRoundCompletion(round.roundNumber)}
+                      {/* Round Status Node (Visual Only) */}
+                      <div 
                         className={`absolute left-6 -translate-x-1/2 top-0 
                         w-9 h-9 rounded-full flex items-center justify-center z-10 
-                        transition-all cursor-pointer border-[3px] bg-white shadow-sm
+                        transition-all border-[3px] bg-white shadow-sm
                          ${isCompleted 
                             ? 'border-emerald-500 text-emerald-500' 
                             : isCurrent 
                               ? 'border-violet-600 text-violet-600 shadow-violet-200 scale-110' 
-                              : 'border-zinc-200 text-zinc-300 hover:border-zinc-300'
+                              : 'border-zinc-200 text-zinc-300'
                          }`}
                       >
                          {isCompleted ? <Check size={16} strokeWidth={3} /> : <span className="text-sm font-extrabold">{round.roundNumber}</span>}
-                      </button>
+                      </div>
 
-                      {/* Round Header Text */}
+                      {/* Round Header - Click toggles VISIBILITY, not completion */}
                       <div 
-                        className={`flex items-center justify-between mb-4 cursor-pointer select-none ${isCompleted ? 'opacity-50' : 'opacity-100'}`}
-                        onClick={() => toggleRoundCompletion(round.roundNumber)}
+                        className={`flex items-center justify-between mb-4 select-none ${isCompleted ? 'opacity-60' : 'opacity-100'}`}
                       >
-                         <div className="flex items-center gap-3">
+                         <div 
+                            onClick={() => toggleExpand(round.roundNumber)}
+                            className="flex items-center gap-3 cursor-pointer hover:opacity-75 transition-opacity"
+                         >
                             <h3 className={`text-lg font-bold tracking-tight ${isCurrent ? 'text-violet-900' : 'text-zinc-700'}`}>
                                {t(lang, 'schedule.round')} {round.roundNumber}
                             </h3>
-                            {isCurrent && (
+                            {isCurrent && !isCompleted && (
                               <span className="px-2 py-0.5 rounded-md bg-violet-600 text-white text-[10px] font-bold uppercase tracking-wide shadow-sm animate-pulse">
                                 Now
                               </span>
                             )}
+                            <div className="text-zinc-300">
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </div>
                          </div>
                          
-                         <div className="text-xs font-medium text-zinc-400 flex items-center gap-1 hover:text-zinc-600 transition-colors">
+                         {/* Action Area: Separated from the header text click to prevent accidents */}
+                         <div className="flex items-center">
                             {isCompleted ? (
-                              <span className="flex items-center gap-1 bg-zinc-50 px-2 py-1 rounded-full border border-zinc-100">
+                              <button 
+                                onClick={() => toggleRoundCompletion(round.roundNumber)}
+                                className="flex items-center gap-1 bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-200 text-xs font-bold text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+                              >
                                 {t(lang, 'schedule.reopen')} <ChevronDown size={12}/>
-                              </span>
+                              </button>
                             ) : (
-                              <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white px-2 py-1 rounded-full border border-zinc-100 shadow-sm text-emerald-600">
-                                {t(lang, 'schedule.markDone')} <CheckCircle2 size={12}/>
-                              </span>
+                               <HoldButton 
+                                 onComplete={() => toggleRoundCompletion(round.roundNumber)} 
+                                 lang={lang}
+                               />
                             )}
                          </div>
                       </div>
 
                       {/* Pairs Grid */}
-                      <div className={`transition-all duration-500 ease-in-out origin-top
-                        ${isCompleted ? 'max-h-0 overflow-hidden opacity-0 scale-y-95' : 'max-h-[3000px] opacity-100 scale-y-100'}
+                      <div className={`transition-all duration-500 ease-in-out origin-top overflow-hidden
+                        ${!isExpanded ? 'max-h-0 opacity-0 scale-y-95' : 'max-h-[3000px] opacity-100 scale-y-100'}
                       `}>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-4">
                             {round.pairs.map((pair, idx) => (
-                               <PairCard key={idx} pair={pair} isCurrent={isCurrent} />
+                               <PairCard key={idx} pair={pair} isCurrent={isCurrent && !isCompleted} />
                             ))}
                             {round.restingMember && <RestingCard member={round.restingMember} lang={lang} />}
                          </div>
@@ -170,6 +206,79 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
 };
 
 // --- Sub-components ---
+
+const HoldButton: React.FC<{ onComplete: () => void, lang: Language }> = ({ onComplete, lang }) => {
+  const [progress, setProgress] = useState(0);
+  const [isHolding, setIsHolding] = useState(false);
+  const requestRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(0);
+
+  // Duration in ms to hold
+  const HOLD_DURATION = 600;
+
+  const start = (e: React.PointerEvent) => {
+    // Prevent default context menu on mobile
+    e.preventDefault(); 
+    setIsHolding(true);
+    startTimeRef.current = Date.now();
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const p = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+      setProgress(p);
+
+      if (p < 100) {
+        requestRef.current = requestAnimationFrame(animate);
+      } else {
+        // Complete
+        if (navigator.vibrate) navigator.vibrate(50);
+        onComplete();
+        setProgress(0);
+        setIsHolding(false);
+      }
+    };
+    requestRef.current = requestAnimationFrame(animate);
+  };
+
+  const stop = () => {
+    if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    setIsHolding(false);
+    setProgress(0);
+  };
+
+  return (
+    <button
+      onPointerDown={start}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onContextMenu={(e) => e.preventDefault()}
+      className={`
+        relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-lg 
+        border text-xs font-bold uppercase tracking-wider transition-all select-none
+        ${isHolding ? 'scale-95 border-violet-500' : 'scale-100 border-zinc-200 hover:border-violet-300'}
+        bg-white shadow-sm
+      `}
+    >
+      {/* Fill Background */}
+      <div 
+        className="absolute inset-0 bg-violet-100 z-0 transition-none" 
+        style={{ width: `${progress}%` }}
+      />
+      
+      {/* Content */}
+      <div className="relative z-10 flex items-center gap-2 text-violet-700">
+         {isHolding ? (
+             <span>{lang === 'es' ? 'Mantén...' : 'Hold...'}</span>
+         ) : (
+            <>
+               <span>{t(lang, 'schedule.markDone')}</span>
+               <CheckCircle2 size={14} />
+            </>
+         )}
+      </div>
+    </button>
+  );
+};
 
 const PairCard: React.FC<{ pair: Pair, isCurrent: boolean }> = ({ pair, isCurrent }) => (
   <div className={`
