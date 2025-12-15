@@ -4,8 +4,9 @@ import { Member, Round } from '../types';
 // Tipos de acciones P2P
 export type TimerActionPayload = 
   | { type: 'START'; endTimestamp: number; duration: number }
-  | { type: 'STOP'; timeLeft: number } // Added timeLeft to sync pause state
-  | { type: 'RESET'; duration: number };
+  | { type: 'STOP'; timeLeft: number }
+  | { type: 'RESET'; duration: number }
+  | { type: 'UPDATE_DURATION'; duration: number }; // Added to sync input changes
 
 export type StateActionPayload = {
   members: Member[];

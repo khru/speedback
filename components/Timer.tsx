@@ -28,7 +28,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   const notifiedSwitchRef = useRef(false);
   const notifiedWarnRef = useRef(false);
 
-  // Sync state ONLY when duration changes manually, NOT when isRunning toggles
+  // Sync state ONLY when duration changes manually (local or via P2P prop update)
   useEffect(() => {
     if (prevDurationRef.current !== duration) {
       setTotalTime(duration * 60);
@@ -68,10 +68,13 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
         setTotalTime(data.duration);
         setTimeLeft(data.duration);
         resetNotificationRefs();
+      } else if (data.type === 'UPDATE_DURATION') {
+        // Update parent state, which triggers the useEffect above to update local visuals
+        onDurationChange(data.duration);
       }
     });
 
-  }, [roomName]);
+  }, [roomName, onDurationChange]);
 
   useEffect(() => {
     audioEndRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -208,6 +211,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     const val = parseInt(e.target.value);
     if (!isNaN(val) && val > 0) {
       onDurationChange(val);
+      broadcast({ type: 'UPDATE_DURATION', duration: val });
     }
   };
 
