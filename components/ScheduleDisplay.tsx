@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Layers, Coffee, CheckCircle2, ArrowRightLeft, ChevronDown, ChevronUp, Clock, Timer, Check, Circle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Coffee, CheckCircle2, ArrowRightLeft, ChevronDown, ChevronUp, Clock, Check, ChevronsDown, ChevronsUp } from 'lucide-react';
 import { Round, Language, Member, Pair } from '../types';
 import { t } from '../constants/translations';
 import { Avatar } from './Avatar';
@@ -12,10 +12,9 @@ interface ScheduleDisplayProps {
 
 export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, roundDurationMinutes }) => {
   const [completedRounds, setCompletedRounds] = useState<Set<number>>(new Set());
-  // Track manually expanded rounds (separate from completion status)
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
 
-  // Auto-expand current round logic
+  // Auto-expand current round logic (first incomplete)
   const currentRoundIndex = rounds.findIndex(r => !completedRounds.has(r.roundNumber));
   
   const toggleRoundCompletion = (roundNum: number) => {
@@ -27,8 +26,8 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
         setExpandedRounds(prevExp => new Set(prevExp).add(roundNum));
       } else {
         next.add(roundNum);
-        // When completing, we generally want to collapse it, 
-        // but we remove it from manual expanded list to let default logic take over
+        // When completing, collapse it to clear the view, 
+        // but keep it available for "Expand All" logic
         setExpandedRounds(prevExp => {
             const newExp = new Set(prevExp);
             newExp.delete(roundNum);
@@ -51,9 +50,21 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
      });
   };
 
+  // Logic for "Expand All" / "Collapse All"
+  const allRoundNumbers = rounds.map(r => r.roundNumber);
+  const areAllExpanded = allRoundNumbers.every(num => expandedRounds.has(num));
+
+  const toggleAll = () => {
+    if (areAllExpanded) {
+      setExpandedRounds(new Set());
+    } else {
+      setExpandedRounds(new Set(allRoundNumbers));
+    }
+  };
+
   const progressPercentage = Math.round((completedRounds.size / rounds.length) * 100);
 
-  // --- Time Calculations (Silent) ---
+  // --- Time Calculations ---
   const SETUP_BUFFER_MINUTES = 10;
   const TRANSITION_BUFFER_MINUTES = 2; 
   
@@ -74,9 +85,24 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
       {/* --- Simplified Header --- */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 px-2">
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight flex items-center gap-3">
-              {t(lang, 'schedule.title')}
-            </h2>
+            <div className="flex items-center justify-between md:justify-start gap-4">
+              <h2 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight flex items-center gap-3">
+                {t(lang, 'schedule.title')}
+              </h2>
+              
+              {/* Expand All Toggle */}
+              <button
+                onClick={toggleAll}
+                className="flex items-center gap-1.5 text-[10px] md:text-xs font-bold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors border border-violet-100"
+              >
+                {areAllExpanded ? <ChevronsUp size={14} /> : <ChevronsDown size={14} />}
+                {areAllExpanded 
+                  ? (lang === 'es' ? 'Contraer todo' : 'Collapse all') 
+                  : (lang === 'es' ? 'Expandir todo' : 'Expand all')
+                }
+              </button>
+            </div>
+
             <div className="flex items-center gap-2 mt-2 text-zinc-500 font-medium text-xs md:text-sm">
                <span>{rounds.length} {t(lang, 'schedule.roundsTotal').toLowerCase()}</span>
                <span className="w-1 h-1 bg-zinc-300 rounded-full"/>
@@ -124,7 +150,6 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
                const isCurrent = currentRoundIndex === index;
                
                // Logic: Open if it's the current active round OR if manually expanded
-               // But if it's completed, it's closed by default unless manually expanded
                const isExpanded = expandedRounds.has(round.roundNumber) || (isCurrent && !isCompleted);
                
                return (
@@ -145,10 +170,8 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
                          {isCompleted ? <Check size={14} className="md:w-4 md:h-4" strokeWidth={3} /> : <span className="text-xs md:text-sm font-extrabold">{round.roundNumber}</span>}
                       </div>
 
-                      {/* Round Header - Click toggles VISIBILITY, not completion */}
-                      <div 
-                        className={`flex items-center justify-between mb-4 select-none ${isCompleted ? 'opacity-60' : 'opacity-100'}`}
-                      >
+                      {/* Round Header */}
+                      <div className={`flex items-center justify-between mb-4 select-none ${isCompleted ? 'opacity-60' : 'opacity-100'}`}>
                          <div 
                             onClick={() => toggleExpand(round.roundNumber)}
                             className="flex items-center gap-2 md:gap-3 cursor-pointer hover:opacity-75 transition-opacity"
@@ -166,21 +189,30 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
                             </div>
                          </div>
                          
-                         {/* Action Area: Separated from the header text click to prevent accidents */}
+                         {/* Simple Mark Done Button */}
                          <div className="flex items-center">
-                            {isCompleted ? (
-                              <button 
-                                onClick={() => toggleRoundCompletion(round.roundNumber)}
-                                className="flex items-center gap-1 bg-zinc-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-zinc-200 text-[10px] md:text-xs font-bold text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
-                              >
-                                {t(lang, 'schedule.reopen')} <ChevronDown size={10} className="md:w-3 md:h-3"/>
-                              </button>
-                            ) : (
-                               <HoldButton 
-                                 onComplete={() => toggleRoundCompletion(round.roundNumber)} 
-                                 lang={lang}
-                               />
-                            )}
+                            <button
+                              onClick={() => toggleRoundCompletion(round.roundNumber)}
+                              className={`
+                                flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all shadow-sm border
+                                ${isCompleted 
+                                  ? 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100' 
+                                  : 'bg-white border-violet-100 text-violet-600 hover:bg-violet-50 hover:border-violet-200'
+                                }
+                              `}
+                            >
+                              {isCompleted ? (
+                                <>
+                                  {t(lang, 'schedule.reopen')}
+                                  <ChevronDown size={12} />
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={14} />
+                                  {t(lang, 'schedule.markDone')}
+                                </>
+                              )}
+                            </button>
                          </div>
                       </div>
 
@@ -206,79 +238,6 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
 };
 
 // --- Sub-components ---
-
-const HoldButton: React.FC<{ onComplete: () => void, lang: Language }> = ({ onComplete, lang }) => {
-  const [progress, setProgress] = useState(0);
-  const [isHolding, setIsHolding] = useState(false);
-  const requestRef = useRef<number>(0);
-  const startTimeRef = useRef<number>(0);
-
-  // Duration in ms to hold
-  const HOLD_DURATION = 600;
-
-  const start = (e: React.PointerEvent) => {
-    // Prevent default context menu on mobile
-    e.preventDefault(); 
-    setIsHolding(true);
-    startTimeRef.current = Date.now();
-    
-    const animate = () => {
-      const elapsed = Date.now() - startTimeRef.current;
-      const p = Math.min((elapsed / HOLD_DURATION) * 100, 100);
-      setProgress(p);
-
-      if (p < 100) {
-        requestRef.current = requestAnimationFrame(animate);
-      } else {
-        // Complete
-        if (navigator.vibrate) navigator.vibrate(50);
-        onComplete();
-        setProgress(0);
-        setIsHolding(false);
-      }
-    };
-    requestRef.current = requestAnimationFrame(animate);
-  };
-
-  const stop = () => {
-    if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    setIsHolding(false);
-    setProgress(0);
-  };
-
-  return (
-    <button
-      onPointerDown={start}
-      onPointerUp={stop}
-      onPointerLeave={stop}
-      onContextMenu={(e) => e.preventDefault()}
-      className={`
-        relative overflow-hidden flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-lg 
-        border text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all select-none
-        ${isHolding ? 'scale-95 border-violet-500' : 'scale-100 border-zinc-200 hover:border-violet-300'}
-        bg-white shadow-sm
-      `}
-    >
-      {/* Fill Background */}
-      <div 
-        className="absolute inset-0 bg-violet-100 z-0 transition-none" 
-        style={{ width: `${progress}%` }}
-      />
-      
-      {/* Content */}
-      <div className="relative z-10 flex items-center gap-2 text-violet-700">
-         {isHolding ? (
-             <span>{lang === 'es' ? 'Mantén...' : 'Hold...'}</span>
-         ) : (
-            <>
-               <span>{t(lang, 'schedule.markDone')}</span>
-               <CheckCircle2 size={12} className="md:w-3.5 md:h-3.5" />
-            </>
-         )}
-      </div>
-    </button>
-  );
-};
 
 const PairCard: React.FC<{ pair: Pair, isCurrent: boolean }> = ({ pair, isCurrent }) => (
   <div className={`
