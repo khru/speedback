@@ -1,0 +1,16 @@
+{
+  "name": "Speedback",
+  "short_name": "Speedback",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#ffffff",
+  "description": "Herramienta profesional para sesiones de feedback rotativo.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ]
+}
