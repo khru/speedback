@@ -28,7 +28,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   const notifiedSwitchRef = useRef(false);
   const notifiedWarnRef = useRef(false);
 
-  // Sync state ONLY when duration changes manually (local or via P2P prop update)
+  // Sync state ONLY when duration changes manually (local or via sync prop update)
   useEffect(() => {
     if (prevDurationRef.current !== duration) {
       setTotalTime(duration * 60);
@@ -38,14 +38,14 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     }
   }, [duration]);
 
-  // Hook into P2P
+  // Hook into Sync Service
   useEffect(() => {
     if (!roomName) return;
-    const p2p = getP2P();
-    if (!p2p) return;
+    const sync = getP2P();
+    if (!sync) return;
 
-    // Listener for P2P timer events
-    p2p.onTimer((data: TimerActionPayload) => {
+    // Listener for sync timer events
+    sync.onTimer((data: TimerActionPayload) => {
       if (data.type === 'START') {
         const { endTimestamp, duration: remoteDuration } = data;
         endTimeRef.current = endTimestamp;
@@ -136,7 +136,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
           if (remaining <= 0) handleComplete();
           else setTimeLeft(remaining);
         } else {
-          // Fallback if endTime not set (should not happen in p2p start)
+          // Fallback if endTime not set
           setTimeLeft((prev) => {
             if (prev <= 1) {
               handleComplete();
@@ -161,9 +161,9 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   };
 
   const broadcast = (payload: TimerActionPayload) => {
-    const p2p = getP2P();
-    if (p2p) {
-      p2p.sendTimer(payload);
+    const sync = getP2P();
+    if (sync) {
+      sync.sendTimer(payload);
     }
   };
 
@@ -179,14 +179,14 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     if (remaining < halfTime + 10) notifiedWarnRef.current = true;
     if (remaining < halfTime) notifiedSwitchRef.current = true;
 
-    // Send P2P
+    // Send Broadcast
     broadcast({ type: 'START', endTimestamp, duration: totalTime });
   };
 
   const handlePause = () => {
     setIsRunning(false);
     
-    // Calculate exact timeLeft to save before nullifying endTimeRef
+    // Calculate exact timeLeft
     let currentRemaining = timeLeft;
     if (endTimeRef.current) {
         currentRemaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
@@ -248,10 +248,10 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   }
 
   return (
-    <div className="bg-[#1e1e2e] rounded-2xl p-6 shadow-2xl border border-white/5 relative overflow-hidden group">
+    <div className="bg-[#1e1e2e] rounded-2xl p-4 md:p-6 shadow-2xl border border-white/5 relative overflow-hidden group">
       <div className={`absolute top-0 right-0 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-opacity duration-1000 ${isRunning ? 'opacity-100' : 'opacity-20'}`} />
       
-      <div className="flex justify-between items-start mb-6 relative z-10">
+      <div className="flex justify-between items-start mb-4 md:mb-6 relative z-10">
         <div className="flex items-center gap-2 text-zinc-400">
           <TimerIcon size={18} />
           <span className="text-xs font-bold uppercase tracking-widest">{t(lang, 'timer.title')}</span>
@@ -273,7 +273,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
       </div>
 
       <div className="text-center relative z-10 py-2">
-        <div className={`text-7xl font-mono font-medium tracking-tighter ${statusColor} transition-colors duration-500`}>
+        <div className={`text-6xl md:text-7xl font-mono font-medium tracking-tighter ${statusColor} transition-colors duration-500`}>
           {formatTime(timeLeft)}
         </div>
         
@@ -283,7 +283,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
         </div>
       </div>
 
-      <div className="mt-8 relative z-10 flex items-center justify-between gap-4">
+      <div className="mt-6 md:mt-8 relative z-10 flex items-center justify-between gap-4">
         <div className="flex-grow h-1.5 bg-zinc-800 rounded-full overflow-hidden relative">
           <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-zinc-900 z-10 h-full"></div>
           <div 

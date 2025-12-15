@@ -1,7 +1,6 @@
-import { joinRoom } from 'trystero';
 import { Member, Round } from '../types';
 
-// Tipos de acciones P2P
+// Tipos de acciones
 export type TimerActionPayload = 
   | { type: 'START'; endTimestamp: number; duration: number }
   | { type: 'STOP'; timeLeft: number }
@@ -14,50 +13,72 @@ export type StateActionPayload = {
   timestamp: number;
 };
 
-// Singleton para mantener la conexión
-let roomInstance: any = null;
-let actions: any = null;
+type MessageType = 
+  | { channel: 'syncState'; payload: StateActionPayload }
+  | { channel: 'syncTimer'; payload: TimerActionPayload };
 
-const APP_ID = 'speedback_rotation_v1_app';
+const CHANNEL_NAME = 'speedback_v1_broadcast';
+
+// Singleton para mantener el canal
+let broadcastChannel: BroadcastChannel | null = null;
+let listeners: {
+  onState: ((payload: StateActionPayload) => void) | null;
+  onTimer: ((payload: TimerActionPayload) => void) | null;
+} = {
+  onState: null,
+  onTimer: null
+};
 
 export const connectP2P = (roomId: string) => {
-  if (roomInstance) {
-    return actions;
+  if (broadcastChannel) {
+    return getActions();
   }
 
-  // Conectar usando estrategia MQTT (definida en importmap)
-  const config = { appId: APP_ID };
-  const room = joinRoom(config, roomId);
+  // Inicializar BroadcastChannel
+  broadcastChannel = new BroadcastChannel(`${CHANNEL_NAME}_${roomId}`);
   
-  const [sendState, onState] = room.makeAction<StateActionPayload>('syncState');
-  const [sendTimer, onTimer] = room.makeAction<TimerActionPayload>('syncTimer');
-
-  roomInstance = room;
-  actions = {
-    room,
-    sendState,
-    onState,
-    sendTimer,
-    onTimer,
-    onPeerJoin: room.onPeerJoin,
-    onPeerLeave: room.onPeerLeave
+  broadcastChannel.onmessage = (event) => {
+    const data = event.data as MessageType;
+    if (data.channel === 'syncState' && listeners.onState) {
+      listeners.onState(data.payload);
+    } else if (data.channel === 'syncTimer' && listeners.onTimer) {
+      listeners.onTimer(data.payload);
+    }
   };
 
-  return actions;
+  return getActions();
+};
+
+const getActions = () => {
+  return {
+    sendState: (payload: StateActionPayload) => {
+      broadcastChannel?.postMessage({ channel: 'syncState', payload });
+    },
+    onState: (callback: (payload: StateActionPayload) => void) => {
+      listeners.onState = callback;
+    },
+    sendTimer: (payload: TimerActionPayload) => {
+      broadcastChannel?.postMessage({ channel: 'syncTimer', payload });
+    },
+    onTimer: (callback: (payload: TimerActionPayload) => void) => {
+      listeners.onTimer = callback;
+    },
+    // Mocking peer methods as BroadcastChannel doesn't support peer awareness natively
+    // In a real local-first app, you might not need peer counts, or you'd use a heartbeat.
+    onPeerJoin: (cb: (id: string) => void) => { /* No-op for BroadcastChannel */ },
+    onPeerLeave: (cb: (id: string) => void) => { /* No-op for BroadcastChannel */ }
+  };
 };
 
 export const getP2P = () => {
-  return actions;
+  if (!broadcastChannel) return null;
+  return getActions();
 };
 
 export const disconnectP2P = () => {
-  if (roomInstance) {
-    try {
-      roomInstance.leave();
-    } catch (e) {
-      console.error("Error leaving room", e);
-    }
-    roomInstance = null;
-    actions = null;
+  if (broadcastChannel) {
+    broadcastChannel.close();
+    broadcastChannel = null;
+    listeners = { onState: null, onTimer: null };
   }
 };

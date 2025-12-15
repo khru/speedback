@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, RefreshCw, Download, Zap, LogIn, Globe, LogOut, LayoutGrid, BookOpen, Wifi, FileText, Table2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, Menu, Zap, Globe, LogOut, BookOpen, FileText, Table2, X } from 'lucide-react';
 
 import { MemberInput } from './components/MemberInput';
 import { MemberList } from './components/MemberList';
@@ -15,75 +15,55 @@ import { t } from './constants/translations';
 
 // Simple UUID generator fallback
 const generateId = () => Math.random().toString(36).substr(2, 9);
-const LAST_ROOM_KEY = 'speedback_last_active_room';
+const DEFAULT_ROOM = 'Local Session';
 
 function App() {
   const [members, setMembers] = useState<Member[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
-  const [roomName, setRoomName] = useState<string | null>(null);
-  const [roomInput, setRoomInput] = useState('');
   const [lang, setLang] = useState<Language>('en');
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState(5);
   const [soundMode, setSoundMode] = useState<SoundMode>('all');
-  const [isConnected, setIsConnected] = useState(false);
-  const [peerCount, setPeerCount] = useState(0);
   
-  // Modal State
+  // UI State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
-  // --- Auto-rejoin room on load ---
+  // --- Synchronization Logic (BroadcastChannel) ---
   useEffect(() => {
-    const lastRoom = localStorage.getItem(LAST_ROOM_KEY);
-    if (lastRoom) {
-        setRoomName(lastRoom);
-    }
-  }, []);
-
-  // --- P2P Synchronization Logic ---
-  useEffect(() => {
-    if (!roomName) {
-      disconnectP2P();
-      setIsConnected(false);
-      return;
-    }
-
-    // Connect to P2P Room
-    const p2p = connectP2P(roomName);
-    setIsConnected(true);
+    // Connect to Sync Channel immediately
+    const sync = connectP2P(DEFAULT_ROOM);
 
     // 1. Listen for State Updates (Members & Rounds)
-    p2p.onState((data: StateActionPayload) => {
+    sync.onState((data: StateActionPayload) => {
+      // Simple merge strategy: if remote timestamp is newer (or different), update.
+      // For local broadcast, we just trust the message.
       setMembers(data.members);
       setRounds(data.rounds);
     });
 
-    // 2. Handle New Peers (Sync my state to them)
-    p2p.onPeerJoin((peerId: string) => {
-      setPeerCount(c => c + 1);
-      if (members.length > 0) {
-        p2p.sendState({
-          members,
-          rounds,
-          timestamp: Date.now()
-        });
+    // Load initial state from LocalStorage
+    const saved = localStorage.getItem(`speedback_room_${DEFAULT_ROOM}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setMembers(parsed.members || []);
+        setRounds(parsed.rounds || []);
+      } catch (e) {
+        console.error("Failed to load local data", e);
       }
-    });
-
-    p2p.onPeerLeave(() => {
-      setPeerCount(c => Math.max(0, c - 1));
-    });
+    }
 
     return () => {
+      disconnectP2P();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomName]);
+  }, []);
 
   // Helper to Broadcast Changes
   const broadcastState = (newMembers: Member[], newRounds: Round[]) => {
-    const p2p = connectP2P(roomName || 'default');
-    if (p2p) {
-      p2p.sendState({
+    const sync = connectP2P(DEFAULT_ROOM);
+    if (sync) {
+      sync.sendState({
         members: newMembers,
         rounds: newRounds,
         timestamp: Date.now()
@@ -91,39 +71,11 @@ function App() {
     }
   };
 
-  // --- Persistence ---
-  // Load from local storage on room entry
-  useEffect(() => {
-    if (roomName) {
-       // Persist current room as last active
-       localStorage.setItem(LAST_ROOM_KEY, roomName);
-
-       const saved = localStorage.getItem(`speedback_room_${roomName}`);
-       if (saved) {
-         try {
-           const parsed = JSON.parse(saved);
-           setMembers(parsed.members || []);
-           setRounds(parsed.rounds || []);
-         } catch (e) {
-           console.error("Failed to load room data", e);
-         }
-       } else {
-         // Don't reset if we are just connecting P2P and expect data, 
-         // but if it's a fresh local start without P2P update yet:
-         // setMembers([]); 
-         // setRounds([]);
-       }
-    }
-  }, [roomName]);
-
   // Save to local storage on change
   useEffect(() => {
-    if (roomName) {
-      const data = { members, rounds };
-      localStorage.setItem(`speedback_room_${roomName}`, JSON.stringify(data));
-    }
-  }, [members, rounds, roomName]);
-
+    const data = { members, rounds };
+    localStorage.setItem(`speedback_room_${DEFAULT_ROOM}`, JSON.stringify(data));
+  }, [members, rounds]);
 
   // --- Actions ---
 
@@ -142,7 +94,6 @@ function App() {
       return updatedMembers;
     });
 
-    // Timeout to allow state to settle or just use the local variable
     setTimeout(() => {
         setRounds([]); 
         broadcastState(updatedMembers, []);
@@ -171,12 +122,14 @@ function App() {
     const generatedRounds = generateRotationSchedule(members);
     setRounds(generatedRounds);
     broadcastState(members, generatedRounds);
+    // On mobile, close menu after generating to show results
+    setIsMobileMenuOpen(false);
   };
 
   const exportTXT = () => {
     if (rounds.length === 0) return;
     
-    let text = `${roomName?.toUpperCase() || 'SPEEDBACK'} - Feedback Session\n\n`;
+    let text = `SPEEDBACK - Feedback Session\n\n`;
     rounds.forEach(r => {
       text += `--- ${t(lang, 'schedule.round').toUpperCase()} ${r.roundNumber} ---\n`;
       r.pairs.forEach(p => {
@@ -194,7 +147,6 @@ function App() {
   const exportCSV = () => {
     if (rounds.length === 0) return;
 
-    // CSV Header
     let csv = "Round,Member 1,Member 2,Type,Notes\n";
 
     rounds.forEach(r => {
@@ -215,112 +167,18 @@ function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `speedback-${roomName?.replace(/\s+/g, '-').toLowerCase() || 'session'}.${ext}`;
+    a.download = `speedback-session.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const handleEnterRoom = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (roomInput.trim()) {
-      setRoomName(roomInput.trim());
-    }
-  };
-
-  const handleExitRoom = () => {
-    disconnectP2P();
-    localStorage.removeItem(LAST_ROOM_KEY);
-    setRoomName(null);
-    setRoomInput('');
-    setIsConnected(false);
-    setPeerCount(0);
   };
 
   const toggleLang = () => {
     setLang(prev => prev === 'en' ? 'es' : 'en');
   };
 
-  // ROOM ENTRY VIEW (LANDING PAGE)
-  if (!roomName) {
-    return (
-      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans selection:bg-violet-500/30">
-        
-        {/* Animated Background Gradients */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-violet-600/20 rounded-full blur-[120px] mix-blend-screen animate-pulse"></div>
-          <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[120px] mix-blend-screen"></div>
-        </div>
-        
-        <div className="z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-700">
-          
-          <div className="flex justify-center mb-8">
-             <div className="bg-gradient-to-tr from-slate-800 to-slate-900 p-6 rounded-[2rem] shadow-2xl shadow-black/50 ring-1 ring-white/10 border border-white/5 relative group">
-               <div className="absolute inset-0 bg-gradient-to-tr from-violet-600/20 to-transparent rounded-[2rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-               <Zap className="text-violet-400 w-12 h-12 fill-current relative z-10" />
-             </div>
-          </div>
-          
-          <div className="bg-white rounded-3xl p-8 shadow-2xl shadow-black/20 border border-slate-200/60 relative overflow-hidden">
-             {/* Decorative Elements */}
-            <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-emerald-400"></div>
-            
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">{t(lang, 'common.appTitle')}</h1>
-              <p className="text-slate-500 font-medium text-sm">{t(lang, 'common.subtitle')}</p>
-            </div>
-            
-            <form onSubmit={handleEnterRoom} className="space-y-6">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">{t(lang, 'room.title')}</label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <LayoutGrid className="h-5 w-5 text-slate-400 group-focus-within:text-violet-600 transition-colors" />
-                  </div>
-                  <input 
-                    autoFocus
-                    type="text" 
-                    value={roomInput}
-                    onChange={(e) => setRoomInput(e.target.value)}
-                    placeholder={t(lang, 'room.placeholder')}
-                    className="block w-full pl-11 pr-4 py-4 bg-slate-50 border-2 border-slate-100 text-slate-900 placeholder:text-slate-400 rounded-xl focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 transition-all font-semibold text-base"
-                  />
-                </div>
-              </div>
-              <button 
-                type="submit"
-                disabled={!roomInput.trim()}
-                className="w-full bg-slate-900 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-base transition-all shadow-xl shadow-slate-900/10 hover:shadow-violet-600/20 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
-              >
-                <span>{t(lang, 'room.button')}</span>
-                <LogIn size={20} />
-              </button>
-            </form>
-            
-            <div className="mt-8 pt-6 border-t border-slate-100">
-               <p className="text-center text-xs text-slate-400 font-medium flex items-center justify-center gap-1">
-                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                 {t(lang, 'room.hint')}
-               </p>
-            </div>
-          </div>
-
-          <div className="mt-8 flex justify-center">
-            <button 
-               onClick={toggleLang}
-               className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-semibold bg-white/5 hover:bg-white/10 px-6 py-3 rounded-full border border-white/5 backdrop-blur-md"
-            >
-              <Globe size={16} />
-              <span>{lang === 'en' ? 'Cambiar a Español' : 'Switch to English'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // APP VIEW
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row font-sans text-zinc-900">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row font-sans text-zinc-900 overflow-hidden">
       
       <ConfirmModal 
         isOpen={isClearModalOpen}
@@ -335,40 +193,47 @@ function App() {
         lang={lang}
       />
 
-      {/* SIDEBAR: Configuration & Members */}
-      <aside className="w-full md:w-80 lg:w-96 bg-white border-r border-zinc-200 flex-shrink-0 flex flex-col h-auto md:h-screen sticky top-0 shadow-xl shadow-zinc-200/50 z-30">
+      {/* MOBILE HEADER */}
+      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-zinc-200 sticky top-0 z-30 shadow-sm">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-zinc-600 hover:bg-zinc-100 rounded-lg">
+            <Menu size={24} />
+          </button>
+          <div className="flex items-center gap-1.5 text-violet-700">
+            <Zap className="fill-current" size={20} />
+            <h1 className="text-lg font-extrabold tracking-tight text-slate-900">Speedback</h1>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+           <SoundMenu mode={soundMode} onChange={setSoundMode} lang={lang} />
+        </div>
+      </div>
+
+      {/* MOBILE SIDEBAR OVERLAY */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden animate-in fade-in"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* SIDEBAR (Desktop: Sticky / Mobile: Drawer) */}
+      <aside className={`
+        fixed md:static inset-y-0 left-0 z-50 w-[85%] max-w-[320px] md:w-80 lg:w-96 
+        bg-white border-r border-zinc-200 flex flex-col shadow-2xl md:shadow-xl md:shadow-zinc-200/50 
+        transition-transform duration-300 ease-in-out
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         
-        {/* Logo Area */}
-        <div className="p-6 bg-white border-b border-zinc-100">
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex items-center gap-2 text-violet-700">
+        {/* Sidebar Header */}
+        <div className="p-6 bg-white border-b border-zinc-100 flex justify-between items-start">
+           <div className="flex items-center gap-2 text-violet-700">
               <Zap className="fill-current" size={24} />
               <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Speedback</h1>
             </div>
-            
-            {/* Connection Indicator */}
-            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all ${isConnected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>
-              <Wifi size={10} className={isConnected ? "animate-pulse" : ""} />
-              {isConnected ? (
-                <span>{peerCount > 0 ? `${peerCount} Peers` : 'Online'}</span>
-              ) : (
-                <span>Offline</span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center justify-between bg-zinc-50 p-2 rounded-lg border border-zinc-100">
-             <div className="flex items-center gap-2 px-2">
-                <LayoutGrid size={14} className="text-zinc-400"/>
-                <p className="text-xs text-zinc-600 font-bold truncate max-w-[120px]">{roomName}</p>
-             </div>
-             <button 
-                onClick={handleExitRoom}
-                className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all"
-                title={t(lang, 'common.exitRoom')}
-             >
-               <LogOut size={14} />
-             </button>
-          </div>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden p-1 text-zinc-400 hover:text-zinc-600">
+              <X size={24} />
+            </button>
         </div>
 
         {/* Members Management Area */}
@@ -383,7 +248,7 @@ function App() {
         </div>
 
         {/* Action Area */}
-        <div className="p-6 bg-white border-t border-zinc-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] z-10">
+        <div className="p-6 bg-white border-t border-zinc-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] z-10 pb-8 md:pb-6">
           <button
             onClick={handleGenerate}
             disabled={members.length < 2}
@@ -396,14 +261,14 @@ function App() {
       </aside>
 
       {/* MAIN CONTENT: Timer & Schedule */}
-      <main className="flex-grow flex flex-col h-auto md:h-screen overflow-hidden">
+      <main className="flex-grow flex flex-col h-[calc(100vh-65px)] md:h-screen overflow-hidden">
         
-        {/* Header */}
-        <header className="flex-shrink-0 h-20 px-8 border-b border-zinc-200 bg-white/80 backdrop-blur-md flex items-center justify-between z-20 sticky top-0">
+        {/* Desktop Header */}
+        <header className="hidden md:flex flex-shrink-0 h-20 px-8 border-b border-zinc-200 bg-white/80 backdrop-blur-md items-center justify-between z-20 sticky top-0">
            <div>
              <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-               {roomName}
-               <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full uppercase tracking-wider border border-violet-100">Session</span>
+               Session
+               <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full uppercase tracking-wider border border-violet-100">Live Sync</span>
              </h2>
            </div>
 
@@ -430,7 +295,7 @@ function App() {
               </button>
               
               {rounds.length > 0 && (
-                <div className="hidden sm:flex items-center gap-1 bg-white border border-zinc-200 rounded-lg p-1 shadow-sm">
+                <div className="flex items-center gap-1 bg-white border border-zinc-200 rounded-lg p-1 shadow-sm">
                    <button
                     onClick={exportTXT}
                     className="p-1.5 hover:bg-zinc-100 rounded-md text-zinc-600 transition-colors"
@@ -452,8 +317,26 @@ function App() {
         </header>
 
         {/* Scrollable Content */}
-        <div className="flex-grow overflow-y-auto p-6 md:p-10 lg:p-12 custom-scrollbar">
-          <div className="max-w-5xl mx-auto space-y-12 pb-20">
+        <div className="flex-grow overflow-y-auto p-4 md:p-10 lg:p-12 custom-scrollbar pb-24 md:pb-12">
+          
+          {/* Mobile Toolbar (Export/Lang/Guide) */}
+          <div className="md:hidden flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+              <button onClick={() => setIsGuideOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-violet-50 text-violet-700 rounded-lg text-xs font-bold border border-violet-100 whitespace-nowrap">
+                <BookOpen size={14} /> {t(lang, 'recommendations.button')}
+              </button>
+              <button onClick={toggleLang} className="flex items-center gap-2 px-3 py-2 bg-zinc-100 text-zinc-600 rounded-lg text-xs font-bold whitespace-nowrap">
+                <Globe size={14} /> {lang.toUpperCase()}
+              </button>
+               {rounds.length > 0 && (
+                <>
+                  <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 bg-white border border-zinc-200 text-zinc-600 rounded-lg text-xs font-bold whitespace-nowrap">
+                    <Table2 size={14} /> CSV
+                  </button>
+                </>
+              )}
+          </div>
+
+          <div className="max-w-5xl mx-auto space-y-8 md:space-y-12">
             
             {/* Timer Section */}
             <section className="transform transition-all">
@@ -462,7 +345,7 @@ function App() {
                 onDurationChange={setSessionDurationMinutes}
                 lang={lang} 
                 soundMode={soundMode}
-                roomName={roomName}
+                roomName={DEFAULT_ROOM}
               />
             </section>
 
@@ -475,14 +358,20 @@ function App() {
                   roundDurationMinutes={sessionDurationMinutes}
                 />
               ) : (
-                <div className="mt-10 p-12 rounded-3xl border-2 border-dashed border-zinc-200 bg-white/50 flex flex-col items-center justify-center text-center">
-                  <div className="w-20 h-20 bg-gradient-to-br from-zinc-100 to-zinc-50 rounded-3xl flex items-center justify-center mb-6 text-zinc-300 shadow-sm border border-white">
-                    <RefreshCw size={32} />
+                <div className="mt-6 md:mt-10 p-8 md:p-12 rounded-3xl border-2 border-dashed border-zinc-200 bg-white/50 flex flex-col items-center justify-center text-center">
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-zinc-100 to-zinc-50 rounded-3xl flex items-center justify-center mb-4 md:mb-6 text-zinc-300 shadow-sm border border-white">
+                    <Zap size={32} />
                   </div>
-                  <h3 className="text-xl font-bold text-zinc-800">{t(lang, 'schedule.waiting')}</h3>
-                  <p className="text-zinc-500 max-w-md mt-2 leading-relaxed">
+                  <h3 className="text-lg md:text-xl font-bold text-zinc-800">{t(lang, 'schedule.waiting')}</h3>
+                  <p className="text-zinc-500 max-w-xs md:max-w-md mt-2 leading-relaxed text-sm md:text-base">
                     {t(lang, 'schedule.waitingDesc')}
                   </p>
+                  <button 
+                    onClick={() => setIsMobileMenuOpen(true)} 
+                    className="md:hidden mt-6 px-6 py-2 bg-slate-900 text-white rounded-full text-sm font-bold"
+                  >
+                    Open Menu
+                  </button>
                 </div>
               )}
             </section>

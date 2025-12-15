@@ -202,7 +202,7 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOp
               <BookOpen className="text-violet-600" size={20} />
               <span>{t(lang, 'recommendations.title')}</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">{t(lang, 'recommendations.subtitle')}</p>
+            <p className="text-xs text-slate-500 mt-1">Choose a framework for your team</p>
           </div>
           
           <div className="flex md:flex-col p-2 gap-1 w-full">
