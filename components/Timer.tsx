@@ -17,6 +17,9 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   const [totalTime, setTotalTime] = useState(duration * 60);
   const [isRunning, setIsRunning] = useState(false);
   
+  // Ref to track duration changes vs pause events
+  const prevDurationRef = useRef(duration);
+  
   const audioEndRef = useRef<HTMLAudioElement | null>(null);
   const audioSwitchRef = useRef<HTMLAudioElement | null>(null);
   const audioWarnRef = useRef<HTMLAudioElement | null>(null);
@@ -25,13 +28,15 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   const notifiedSwitchRef = useRef(false);
   const notifiedWarnRef = useRef(false);
 
-  // Sync state when prop changes locally
+  // Sync state ONLY when duration changes manually, NOT when isRunning toggles
   useEffect(() => {
-    if (!isRunning) {
+    if (prevDurationRef.current !== duration) {
       setTotalTime(duration * 60);
       setTimeLeft(duration * 60);
+      setIsRunning(false);
+      prevDurationRef.current = duration;
     }
-  }, [duration, isRunning]);
+  }, [duration]);
 
   // Hook into P2P
   useEffect(() => {
@@ -53,6 +58,10 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
       } else if (data.type === 'STOP') {
         setIsRunning(false);
         endTimeRef.current = null;
+        // Sync pause time from peer to avoid drift
+        if (data.timeLeft !== undefined) {
+            setTimeLeft(data.timeLeft);
+        }
       } else if (data.type === 'RESET') {
         setIsRunning(false);
         endTimeRef.current = null;
@@ -173,8 +182,16 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
 
   const handlePause = () => {
     setIsRunning(false);
+    
+    // Calculate exact timeLeft to save before nullifying endTimeRef
+    let currentRemaining = timeLeft;
+    if (endTimeRef.current) {
+        currentRemaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+        setTimeLeft(currentRemaining);
+    }
+    
     endTimeRef.current = null;
-    broadcast({ type: 'STOP' });
+    broadcast({ type: 'STOP', timeLeft: currentRemaining });
   };
 
   const handleReset = () => {

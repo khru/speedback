@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, RefreshCw, Download, Zap, LogIn, Globe, LogOut, LayoutGrid, BookOpen, Wifi } from 'lucide-react';
+import { Sparkles, RefreshCw, Download, Zap, LogIn, Globe, LogOut, LayoutGrid, BookOpen, Wifi, FileText, Table2 } from 'lucide-react';
 
 import { MemberInput } from './components/MemberInput';
 import { MemberList } from './components/MemberList';
@@ -15,6 +15,7 @@ import { t } from './constants/translations';
 
 // Simple UUID generator fallback
 const generateId = () => Math.random().toString(36).substr(2, 9);
+const LAST_ROOM_KEY = 'speedback_last_active_room';
 
 function App() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -31,6 +32,14 @@ function App() {
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
+  // --- Auto-rejoin room on load ---
+  useEffect(() => {
+    const lastRoom = localStorage.getItem(LAST_ROOM_KEY);
+    if (lastRoom) {
+        setRoomName(lastRoom);
+    }
+  }, []);
+
   // --- P2P Synchronization Logic ---
   useEffect(() => {
     if (!roomName) {
@@ -45,8 +54,6 @@ function App() {
 
     // 1. Listen for State Updates (Members & Rounds)
     p2p.onState((data: StateActionPayload) => {
-      // Simple "Last Write Wins" based on user action implies we accept incoming
-      // In a real app we might compare timestamps, but here we trust the latest msg
       setMembers(data.members);
       setRounds(data.rounds);
     });
@@ -54,7 +61,6 @@ function App() {
     // 2. Handle New Peers (Sync my state to them)
     p2p.onPeerJoin((peerId: string) => {
       setPeerCount(c => c + 1);
-      // If I have data, share it with the new person
       if (members.length > 0) {
         p2p.sendState({
           members,
@@ -69,7 +75,6 @@ function App() {
     });
 
     return () => {
-      // We don't necessarily disconnect on every render, handled by room change check
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName]);
@@ -90,6 +95,9 @@ function App() {
   // Load from local storage on room entry
   useEffect(() => {
     if (roomName) {
+       // Persist current room as last active
+       localStorage.setItem(LAST_ROOM_KEY, roomName);
+
        const saved = localStorage.getItem(`speedback_room_${roomName}`);
        if (saved) {
          try {
@@ -100,8 +108,10 @@ function App() {
            console.error("Failed to load room data", e);
          }
        } else {
-         setMembers([]);
-         setRounds([]);
+         // Don't reset if we are just connecting P2P and expect data, 
+         // but if it's a fresh local start without P2P update yet:
+         // setMembers([]); 
+         // setRounds([]);
        }
     }
   }, [roomName]);
@@ -163,7 +173,7 @@ function App() {
     broadcastState(members, generatedRounds);
   };
 
-  const exportSchedule = () => {
+  const exportTXT = () => {
     if (rounds.length === 0) return;
     
     let text = `${roomName?.toUpperCase() || 'SPEEDBACK'} - Feedback Session\n\n`;
@@ -178,11 +188,34 @@ function App() {
       text += "\n";
     });
 
-    const blob = new Blob([text], { type: 'text/plain' });
+    downloadFile(text, 'txt');
+  };
+
+  const exportCSV = () => {
+    if (rounds.length === 0) return;
+
+    // CSV Header
+    let csv = "Round,Member 1,Member 2,Type,Notes\n";
+
+    rounds.forEach(r => {
+        r.pairs.forEach(p => {
+            csv += `${r.roundNumber},"${p.member1.name}","${p.member2.name}","Pair",""\n`;
+        });
+        if (r.restingMember) {
+            csv += `${r.roundNumber},"${r.restingMember.name}","","Rest",""\n`;
+        }
+    });
+
+    downloadFile(csv, 'csv');
+  };
+
+  const downloadFile = (content: string, ext: 'txt' | 'csv') => {
+    const mime = ext === 'csv' ? 'text/csv' : 'text/plain';
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `speedback-${roomName?.replace(/\s+/g, '-').toLowerCase() || 'session'}.txt`;
+    a.download = `speedback-${roomName?.replace(/\s+/g, '-').toLowerCase() || 'session'}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -196,6 +229,7 @@ function App() {
 
   const handleExitRoom = () => {
     disconnectP2P();
+    localStorage.removeItem(LAST_ROOM_KEY);
     setRoomName(null);
     setRoomInput('');
     setIsConnected(false);
@@ -396,13 +430,23 @@ function App() {
               </button>
               
               {rounds.length > 0 && (
-                <button
-                  onClick={exportSchedule}
-                  className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-lg text-sm font-bold text-zinc-700 hover:border-violet-300 hover:text-violet-700 transition-all shadow-sm"
-                >
-                  <Download size={16} />
-                  {t(lang, 'sidebar.export')}
-                </button>
+                <div className="hidden sm:flex items-center gap-1 bg-white border border-zinc-200 rounded-lg p-1 shadow-sm">
+                   <button
+                    onClick={exportTXT}
+                    className="p-1.5 hover:bg-zinc-100 rounded-md text-zinc-600 transition-colors"
+                    title="Export TXT"
+                  >
+                    <FileText size={16} />
+                  </button>
+                  <div className="w-px h-4 bg-zinc-200"></div>
+                   <button
+                    onClick={exportCSV}
+                    className="p-1.5 hover:bg-zinc-100 rounded-md text-zinc-600 transition-colors"
+                    title="Export CSV"
+                  >
+                    <Table2 size={16} />
+                  </button>
+                </div>
               )}
            </div>
         </header>
