@@ -1,4 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="128" fill="#0f172a"/>
-  <path d="M256 112L160 256H224V400L352 224H288V112H256Z" fill="#8b5cf6" stroke="#ffffff" stroke-width="20" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="bg_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1b4b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4c1d95;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="bolt_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e0e7ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bg_grad)"/>
+  <path d="M280 48L128 264H240V464L392 248H280V48Z" fill="url(#bolt_grad)" stroke="#1e1b4b" stroke-width="12" stroke-linejoin="round"/>
 </svg>

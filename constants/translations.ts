@@ -21,7 +21,8 @@ export const TRANSLATIONS = {
       confirm: "Are you sure you want to delete everyone?",
       close: "Close",
       exitRoom: "Exit Room",
-      language: "Language"
+      language: "Language",
+      install: "Install App"
     },
     room: {
       title: "Create Feedback Room",
@@ -98,7 +99,8 @@ export const TRANSLATIONS = {
       confirm: "¿Estás seguro de que quieres borrar a todos?",
       close: "Cerrar",
       exitRoom: "Salir de Sala",
-      language: "Idioma"
+      language: "Idioma",
+      install: "Instalar App"
     },
     room: {
       title: "Crear Sala de Feedback",

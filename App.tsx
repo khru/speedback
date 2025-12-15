@@ -8,6 +8,7 @@ import { Timer } from './components/Timer';
 import { ConfirmModal } from './components/ConfirmModal';
 import { RecommendationsModal } from './components/RecommendationsModal';
 import { SoundMenu } from './components/SoundMenu';
+import { InstallPWA } from './components/InstallPWA';
 import { generateRotationSchedule } from './services/rotationService';
 import { Member, Round, Language, SoundMode } from './types';
 import { t } from './constants/translations';
@@ -250,6 +251,8 @@ function App() {
 
         {/* Action Area */}
         <div className="p-6 bg-white border-t border-zinc-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] z-10 pb-8 md:pb-6">
+          <InstallPWA lang={lang} variant="mobile" />
+          
           <button
             onClick={handleGenerate}
             disabled={members.length < 2}
@@ -273,6 +276,8 @@ function App() {
            </div>
 
            <div className="flex items-center gap-3">
+              <InstallPWA lang={lang} variant="desktop" />
+              
               <SoundMenu mode={soundMode} onChange={setSoundMode} lang={lang} />
               
               <div className="w-px h-6 bg-zinc-200 mx-1"></div>
