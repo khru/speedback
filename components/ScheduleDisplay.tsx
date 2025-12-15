@@ -6,36 +6,34 @@ import { Avatar } from './Avatar';
 
 interface ScheduleDisplayProps {
   rounds: Round[];
+  completedRounds: number[];
+  onToggleRound: (roundNum: number) => void;
   lang: Language;
   roundDurationMinutes: number;
 }
 
-export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, roundDurationMinutes }) => {
-  const [completedRounds, setCompletedRounds] = useState<Set<number>>(new Set());
+export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, completedRounds, onToggleRound, lang, roundDurationMinutes }) => {
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
 
   // Auto-expand current round logic (first incomplete)
-  const currentRoundIndex = rounds.findIndex(r => !completedRounds.has(r.roundNumber));
+  const currentRoundIndex = rounds.findIndex(r => !completedRounds.includes(r.roundNumber));
   
-  const toggleRoundCompletion = (roundNum: number) => {
-    setCompletedRounds(prev => {
-      const next = new Set(prev);
-      if (next.has(roundNum)) {
-        next.delete(roundNum);
-        // When reopening, ensure it's expanded
-        setExpandedRounds(prevExp => new Set(prevExp).add(roundNum));
-      } else {
-        next.add(roundNum);
-        // When completing, collapse it to clear the view, 
-        // but keep it available for "Expand All" logic
-        setExpandedRounds(prevExp => {
-            const newExp = new Set(prevExp);
-            newExp.delete(roundNum);
-            return newExp;
+  const handleToggle = (roundNum: number) => {
+    // Call parent handler
+    onToggleRound(roundNum);
+
+    // Update local UI state (Collapse if completing, Expand if reopening)
+    if (completedRounds.includes(roundNum)) {
+        // Was completed, now reopening -> Expand
+        setExpandedRounds(prev => new Set(prev).add(roundNum));
+    } else {
+        // Was open, now completing -> Collapse
+        setExpandedRounds(prev => {
+            const next = new Set(prev);
+            next.delete(roundNum);
+            return next;
         });
-      }
-      return next;
-    });
+    }
   };
 
   const toggleExpand = (roundNum: number) => {
@@ -62,7 +60,7 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
     }
   };
 
-  const progressPercentage = Math.round((completedRounds.size / rounds.length) * 100);
+  const progressPercentage = Math.round((completedRounds.length / rounds.length) * 100);
 
   // --- Time Calculations ---
   const SETUP_BUFFER_MINUTES = 10;
@@ -146,7 +144,7 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
 
          <div className="space-y-6 md:space-y-8">
             {rounds.map((round, index) => {
-               const isCompleted = completedRounds.has(round.roundNumber);
+               const isCompleted = completedRounds.includes(round.roundNumber);
                const isCurrent = currentRoundIndex === index;
                
                // Logic: Open if it's the current active round OR if manually expanded
@@ -192,7 +190,7 @@ export const ScheduleDisplay: React.FC<ScheduleDisplayProps> = ({ rounds, lang, 
                          {/* Simple Mark Done Button */}
                          <div className="flex items-center">
                             <button
-                              onClick={() => toggleRoundCompletion(round.roundNumber)}
+                              onClick={() => handleToggle(round.roundNumber)}
                               className={`
                                 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all shadow-sm border
                                 ${isCompleted 

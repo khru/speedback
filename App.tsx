@@ -22,11 +22,13 @@ interface AppState {
   lang: Language;
   sessionDurationMinutes: number;
   soundMode: SoundMode;
+  completedRounds: number[];
 }
 
 function App() {
   const [members, setMembers] = useState<Member[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [completedRounds, setCompletedRounds] = useState<number[]>([]);
   const [lang, setLang] = useState<Language>('en');
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState(5);
   const [soundMode, setSoundMode] = useState<SoundMode>('all');
@@ -45,6 +47,7 @@ function App() {
         const parsed: AppState = JSON.parse(saved);
         if (parsed.members) setMembers(parsed.members);
         if (parsed.rounds) setRounds(parsed.rounds);
+        if (parsed.completedRounds) setCompletedRounds(parsed.completedRounds);
         if (parsed.lang) setLang(parsed.lang);
         if (parsed.sessionDurationMinutes) setSessionDurationMinutes(parsed.sessionDurationMinutes);
         if (parsed.soundMode) setSoundMode(parsed.soundMode);
@@ -61,12 +64,13 @@ function App() {
     const data: AppState = { 
       members, 
       rounds, 
+      completedRounds,
       lang, 
       sessionDurationMinutes, 
       soundMode 
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [members, rounds, lang, sessionDurationMinutes, soundMode, isLoaded]);
+  }, [members, rounds, completedRounds, lang, sessionDurationMinutes, soundMode, isLoaded]);
 
   // --- Actions ---
 
@@ -83,11 +87,13 @@ function App() {
 
     // Reset rounds when adding members to ensure consistency
     setRounds([]); 
+    setCompletedRounds([]);
   };
 
   const removeMember = (id: string) => {
     setMembers(prev => prev.filter(m => m.id !== id));
     setRounds([]);
+    setCompletedRounds([]);
   };
 
   const openClearModal = () => {
@@ -97,14 +103,26 @@ function App() {
   const confirmClearMembers = () => {
     setMembers([]);
     setRounds([]);
+    setCompletedRounds([]);
     setIsClearModalOpen(false);
   };
 
   const handleGenerate = () => {
     const generatedRounds = generateRotationSchedule(members);
     setRounds(generatedRounds);
+    setCompletedRounds([]); // Reset progress on new generation
     // On mobile, close menu after generating to show results
     setIsMobileMenuOpen(false);
+  };
+
+  const toggleRoundCompletion = (roundNum: number) => {
+    setCompletedRounds(prev => {
+      if (prev.includes(roundNum)) {
+        return prev.filter(r => r !== roundNum);
+      } else {
+        return [...prev, roundNum];
+      }
+    });
   };
 
   const exportTXT = () => {
@@ -112,7 +130,8 @@ function App() {
     
     let text = `SPEEDBACK - Feedback Session\n\n`;
     rounds.forEach(r => {
-      text += `--- ${t(lang, 'schedule.round').toUpperCase()} ${r.roundNumber} ---\n`;
+      const isDone = completedRounds.includes(r.roundNumber) ? '[DONE]' : '[ ]';
+      text += `--- ${t(lang, 'schedule.round').toUpperCase()} ${r.roundNumber} ${isDone} ---\n`;
       r.pairs.forEach(p => {
         text += `• ${p.member1.name} <> ${p.member2.name}\n`;
       });
@@ -128,14 +147,15 @@ function App() {
   const exportCSV = () => {
     if (rounds.length === 0) return;
 
-    let csv = "Round,Member 1,Member 2,Type,Notes\n";
+    let csv = "Round,Status,Member 1,Member 2,Type,Notes\n";
 
     rounds.forEach(r => {
+        const status = completedRounds.includes(r.roundNumber) ? 'Completed' : 'Pending';
         r.pairs.forEach(p => {
-            csv += `${r.roundNumber},"${p.member1.name}","${p.member2.name}","Pair",""\n`;
+            csv += `${r.roundNumber},${status},"${p.member1.name}","${p.member2.name}","Pair",""\n`;
         });
         if (r.restingMember) {
-            csv += `${r.roundNumber},"${r.restingMember.name}","","Rest",""\n`;
+            csv += `${r.roundNumber},${status},"${r.restingMember.name}","","Rest",""\n`;
         }
     });
 
@@ -333,6 +353,8 @@ function App() {
               {rounds.length > 0 ? (
                 <ScheduleDisplay 
                   rounds={rounds} 
+                  completedRounds={completedRounds}
+                  onToggleRound={toggleRoundCompletion}
                   lang={lang} 
                   roundDurationMinutes={sessionDurationMinutes}
                 />
