@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, RefreshCw, Download, Zap, LogIn, Globe, LogOut, LayoutGrid, BookOpen } from 'lucide-react';
+import { Sparkles, RefreshCw, Download, Zap, LogIn, Globe, LogOut, LayoutGrid, BookOpen, Wifi } from 'lucide-react';
 
 import { MemberInput } from './components/MemberInput';
 import { MemberList } from './components/MemberList';
@@ -9,12 +9,12 @@ import { ConfirmModal } from './components/ConfirmModal';
 import { RecommendationsModal } from './components/RecommendationsModal';
 import { SoundMenu } from './components/SoundMenu';
 import { generateRotationSchedule } from './services/rotationService';
+import { connectP2P, disconnectP2P, StateActionPayload } from './services/p2p';
 import { Member, Round, Language, SoundMode } from './types';
 import { t } from './constants/translations';
 
 // Simple UUID generator fallback
 const generateId = () => Math.random().toString(36).substr(2, 9);
-const SYNC_CHANNEL_NAME = 'speedback_global_sync';
 
 function App() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -24,48 +24,71 @@ function App() {
   const [lang, setLang] = useState<Language>('en');
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState(5);
   const [soundMode, setSoundMode] = useState<SoundMode>('all');
+  const [isConnected, setIsConnected] = useState(false);
+  const [peerCount, setPeerCount] = useState(0);
   
   // Modal State
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
-  const syncChannelRef = useRef<BroadcastChannel | null>(null);
-
-  // Initialize Sync Channel
+  // --- P2P Synchronization Logic ---
   useEffect(() => {
-    syncChannelRef.current = new BroadcastChannel(SYNC_CHANNEL_NAME);
-    syncChannelRef.current.onmessage = (event) => {
-      const { type, payload } = event.data;
-      // Only sync if in the same room
-      if (payload.roomName === roomName && roomName !== null) {
-        if (type === 'SYNC_STATE') {
-          setMembers(payload.members);
-          setRounds(payload.rounds);
-        }
-      }
-    };
+    if (!roomName) {
+      disconnectP2P();
+      setIsConnected(false);
+      return;
+    }
 
-    return () => {
-      syncChannelRef.current?.close();
-    };
-  }, [roomName]);
+    // Connect to P2P Room
+    const p2p = connectP2P(roomName);
+    setIsConnected(true);
 
-  const broadcastState = (newMembers: Member[], newRounds: Round[]) => {
-    if (!roomName) return;
-    syncChannelRef.current?.postMessage({
-      type: 'SYNC_STATE',
-      payload: {
-        roomName,
-        members: newMembers,
-        rounds: newRounds
+    // 1. Listen for State Updates (Members & Rounds)
+    p2p.onState((data: StateActionPayload) => {
+      // Simple "Last Write Wins" based on user action implies we accept incoming
+      // In a real app we might compare timestamps, but here we trust the latest msg
+      setMembers(data.members);
+      setRounds(data.rounds);
+    });
+
+    // 2. Handle New Peers (Sync my state to them)
+    p2p.onPeerJoin((peerId: string) => {
+      setPeerCount(c => c + 1);
+      // If I have data, share it with the new person
+      if (members.length > 0) {
+        p2p.sendState({
+          members,
+          rounds,
+          timestamp: Date.now()
+        });
       }
     });
+
+    p2p.onPeerLeave(() => {
+      setPeerCount(c => Math.max(0, c - 1));
+    });
+
+    return () => {
+      // We don't necessarily disconnect on every render, handled by room change check
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomName]);
+
+  // Helper to Broadcast Changes
+  const broadcastState = (newMembers: Member[], newRounds: Round[]) => {
+    const p2p = connectP2P(roomName || 'default');
+    if (p2p) {
+      p2p.sendState({
+        members: newMembers,
+        rounds: newRounds,
+        timestamp: Date.now()
+      });
+    }
   };
 
-  // Load from local storage on mount (Generic Store)
+  // --- Persistence ---
+  // Load from local storage on room entry
   useEffect(() => {
-    // When roomName changes, try to load specific room data if we implemented room persistence
-    // For now, we stick to the global store for simplicity or load "by room"
     if (roomName) {
        const saved = localStorage.getItem(`speedback_room_${roomName}`);
        if (saved) {
@@ -77,36 +100,43 @@ function App() {
            console.error("Failed to load room data", e);
          }
        } else {
-         // Reset if new room
          setMembers([]);
          setRounds([]);
        }
     }
   }, [roomName]);
 
-  // Save to local storage on change AND broadcast
+  // Save to local storage on change
   useEffect(() => {
     if (roomName) {
       const data = { members, rounds };
       localStorage.setItem(`speedback_room_${roomName}`, JSON.stringify(data));
-      // Note: We don't broadcast here to avoid infinite loops, we broadcast on specific actions
     }
   }, [members, rounds, roomName]);
 
-  // Fix: Use functional update to support bulk additions safely in loops
+
+  // --- Actions ---
+
   const addMember = (name: string) => {
     const cleanName = name.trim();
     if (!cleanName) return;
     
+    let updatedMembers: Member[] = [];
+    
     setMembers(prevMembers => {
       if (prevMembers.some(m => m.name.toLowerCase() === cleanName.toLowerCase())) {
+        updatedMembers = prevMembers;
         return prevMembers;
       }
-      const newMembers = [...prevMembers, { id: generateId(), name: cleanName }];
-      broadcastState(newMembers, []); // Clear rounds when modifying members
-      setRounds([]); 
-      return newMembers;
+      updatedMembers = [...prevMembers, { id: generateId(), name: cleanName }];
+      return updatedMembers;
     });
+
+    // Timeout to allow state to settle or just use the local variable
+    setTimeout(() => {
+        setRounds([]); 
+        broadcastState(updatedMembers, []);
+    }, 0);
   };
 
   const removeMember = (id: string) => {
@@ -165,8 +195,11 @@ function App() {
   };
 
   const handleExitRoom = () => {
+    disconnectP2P();
     setRoomName(null);
     setRoomInput('');
+    setIsConnected(false);
+    setPeerCount(0);
   };
 
   const toggleLang = () => {
@@ -278,6 +311,16 @@ function App() {
               <Zap className="fill-current" size={24} />
               <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Speedback</h1>
             </div>
+            
+            {/* Connection Indicator */}
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all ${isConnected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>
+              <Wifi size={10} className={isConnected ? "animate-pulse" : ""} />
+              {isConnected ? (
+                <span>{peerCount > 0 ? `${peerCount} Peers` : 'Online'}</span>
+              ) : (
+                <span>Offline</span>
+              )}
+            </div>
           </div>
           <div className="flex items-center justify-between bg-zinc-50 p-2 rounded-lg border border-zinc-100">
              <div className="flex items-center gap-2 px-2">
@@ -375,6 +418,7 @@ function App() {
                 onDurationChange={setSessionDurationMinutes}
                 lang={lang} 
                 soundMode={soundMode}
+                roomName={roomName}
               />
             </section>
 

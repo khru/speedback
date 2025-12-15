@@ -2,22 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Timer as TimerIcon, Mic, RefreshCw, AlertCircle } from 'lucide-react';
 import { Language, SoundMode } from '../types';
 import { t } from '../constants/translations';
+import { getP2P, TimerActionPayload } from '../services/p2p';
 
 interface TimerProps {
   duration: number;
   onDurationChange: (minutes: number) => void;
   lang: Language;
   soundMode: SoundMode;
+  roomName: string | null;
 }
 
-const CHANNEL_NAME = 'speedback_timer_sync';
-
-export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, soundMode }) => {
+export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, soundMode, roomName }) => {
   const [timeLeft, setTimeLeft] = useState(duration * 60);
   const [totalTime, setTotalTime] = useState(duration * 60);
   const [isRunning, setIsRunning] = useState(false);
   
-  const channelRef = useRef<BroadcastChannel | null>(null);
   const audioEndRef = useRef<HTMLAudioElement | null>(null);
   const audioSwitchRef = useRef<HTMLAudioElement | null>(null);
   const audioWarnRef = useRef<HTMLAudioElement | null>(null);
@@ -26,7 +25,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   const notifiedSwitchRef = useRef(false);
   const notifiedWarnRef = useRef(false);
 
-  // Sync state when prop changes
+  // Sync state when prop changes locally
   useEffect(() => {
     if (!isRunning) {
       setTotalTime(duration * 60);
@@ -34,36 +33,43 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     }
   }, [duration, isRunning]);
 
+  // Hook into P2P
+  useEffect(() => {
+    if (!roomName) return;
+    const p2p = getP2P();
+    if (!p2p) return;
+
+    // Listener for P2P timer events
+    p2p.onTimer((data: TimerActionPayload) => {
+      if (data.type === 'START') {
+        const { endTimestamp, duration: remoteDuration } = data;
+        endTimeRef.current = endTimestamp;
+        setTotalTime(remoteDuration);
+        setIsRunning(true);
+        // Calculate remaining immediately
+        const remaining = Math.max(0, Math.ceil((endTimestamp - Date.now()) / 1000));
+        setTimeLeft(remaining);
+        resetNotificationRefs();
+      } else if (data.type === 'STOP') {
+        setIsRunning(false);
+        endTimeRef.current = null;
+      } else if (data.type === 'RESET') {
+        setIsRunning(false);
+        endTimeRef.current = null;
+        setTotalTime(data.duration);
+        setTimeLeft(data.duration);
+        resetNotificationRefs();
+      }
+    });
+
+  }, [roomName]);
+
   useEffect(() => {
     audioEndRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     audioSwitchRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'); 
     audioWarnRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2866/2866-preview.mp3');
 
-    channelRef.current = new BroadcastChannel(CHANNEL_NAME);
-    channelRef.current.onmessage = (event) => {
-      const { type, payload } = event.data;
-      if (type === 'START') {
-        const { endTimestamp, duration: remoteDuration } = payload;
-        endTimeRef.current = endTimestamp;
-        setTotalTime(remoteDuration);
-        setIsRunning(true);
-        const remaining = Math.max(0, Math.ceil((endTimestamp - Date.now()) / 1000));
-        setTimeLeft(remaining);
-        resetNotificationRefs();
-      } else if (type === 'STOP') {
-        setIsRunning(false);
-        endTimeRef.current = null;
-      } else if (type === 'RESET') {
-        setIsRunning(false);
-        endTimeRef.current = null;
-        setTotalTime(payload.duration);
-        setTimeLeft(payload.duration);
-        resetNotificationRefs();
-      }
-    };
-
     return () => {
-      if (channelRef.current) channelRef.current.close();
       if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
   }, []);
@@ -118,6 +124,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
           if (remaining <= 0) handleComplete();
           else setTimeLeft(remaining);
         } else {
+          // Fallback if endTime not set (should not happen in p2p start)
           setTimeLeft((prev) => {
             if (prev <= 1) {
               handleComplete();
@@ -141,23 +148,33 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     triggerNotification(t(lang, 'timer.notificationTitle'), t(lang, 'timer.notificationBody'), 'end');
   };
 
+  const broadcast = (payload: TimerActionPayload) => {
+    const p2p = getP2P();
+    if (p2p) {
+      p2p.sendTimer(payload);
+    }
+  };
+
   const handleStart = () => {
     const now = Date.now();
     const endTimestamp = now + (timeLeft * 1000);
     endTimeRef.current = endTimestamp;
     resetNotificationRefs();
     setIsRunning(true);
+    
     const remaining = timeLeft;
     const halfTime = Math.ceil(totalTime / 2);
     if (remaining < halfTime + 10) notifiedWarnRef.current = true;
     if (remaining < halfTime) notifiedSwitchRef.current = true;
-    channelRef.current?.postMessage({ type: 'START', payload: { endTimestamp, duration: totalTime } });
+
+    // Send P2P
+    broadcast({ type: 'START', endTimestamp, duration: totalTime });
   };
 
   const handlePause = () => {
     setIsRunning(false);
     endTimeRef.current = null;
-    channelRef.current?.postMessage({ type: 'STOP' });
+    broadcast({ type: 'STOP' });
   };
 
   const handleReset = () => {
@@ -167,7 +184,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     setTimeLeft(newDuration);
     endTimeRef.current = null;
     resetNotificationRefs();
-    channelRef.current?.postMessage({ type: 'RESET', payload: { duration: newDuration } });
+    broadcast({ type: 'RESET', duration: newDuration });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
