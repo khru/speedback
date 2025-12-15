@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Timer as TimerIcon, Mic, RefreshCw, AlertCircle } from 'lucide-react';
 import { Language, SoundMode } from '../types';
 import { t } from '../constants/translations';
@@ -10,31 +10,99 @@ interface TimerProps {
   soundMode: SoundMode;
 }
 
+const TIMER_STORAGE_KEY = 'speedback_timer_v2';
+
+interface TimerState {
+  isRunning: boolean;
+  endTime: number | null; // Timestamp when it should end
+  timeLeft: number; // Seconds left (used when paused)
+  totalTime: number; // For progress bar calculation
+}
+
 export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, soundMode }) => {
   const [timeLeft, setTimeLeft] = useState(duration * 60);
   const [totalTime, setTotalTime] = useState(duration * 60);
   const [isRunning, setIsRunning] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   
   // Ref to track duration changes vs pause events
   const prevDurationRef = useRef(duration);
+  const endTimeRef = useRef<number | null>(null);
   
   const audioEndRef = useRef<HTMLAudioElement | null>(null);
   const audioSwitchRef = useRef<HTMLAudioElement | null>(null);
   const audioWarnRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<number | null>(null);
+  
   const notifiedSwitchRef = useRef(false);
   const notifiedWarnRef = useRef(false);
 
-  // Sync state ONLY when duration changes manually
-  useEffect(() => {
-    if (prevDurationRef.current !== duration) {
-      setTotalTime(duration * 60);
-      setTimeLeft(duration * 60);
-      setIsRunning(false);
-      prevDurationRef.current = duration;
-    }
-  }, [duration]);
+  // --- Persistence Logic ---
 
+  // Load state on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
+    if (saved) {
+      try {
+        const state: TimerState = JSON.parse(saved);
+        setTotalTime(state.totalTime);
+
+        if (state.isRunning && state.endTime) {
+          const now = Date.now();
+          const remaining = Math.ceil((state.endTime - now) / 1000);
+
+          if (remaining > 0) {
+            // Still running in background
+            setTimeLeft(remaining);
+            setIsRunning(true);
+            endTimeRef.current = state.endTime;
+          } else {
+            // Finished while closed
+            setTimeLeft(0);
+            setIsRunning(false);
+            endTimeRef.current = null;
+            // Optionally trigger completion sound here if desired, but user isn't looking
+          }
+        } else {
+          // Was paused or stopped
+          setTimeLeft(state.timeLeft);
+          setIsRunning(false);
+          endTimeRef.current = null;
+        }
+      } catch (e) {
+        console.error("Failed to load timer state", e);
+      }
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Save state helper
+  const saveState = useCallback((running: boolean, end: number | null, currentLeft: number, total: number) => {
+    const state: TimerState = {
+      isRunning: running,
+      endTime: end,
+      timeLeft: currentLeft,
+      totalTime: total
+    };
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(state));
+  }, []);
+
+  // Sync state ONLY when duration changes manually by user via props
+  // We check isLoaded to avoid overwriting restored state on initial mount
+  useEffect(() => {
+    if (isLoaded && prevDurationRef.current !== duration) {
+      const newSeconds = duration * 60;
+      setTotalTime(newSeconds);
+      setTimeLeft(newSeconds);
+      setIsRunning(false);
+      endTimeRef.current = null;
+      prevDurationRef.current = duration;
+      
+      saveState(false, null, newSeconds, newSeconds);
+    }
+  }, [duration, isLoaded, saveState]);
+
+  // --- Audio Setup ---
   useEffect(() => {
     audioEndRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     audioSwitchRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'); 
@@ -52,8 +120,6 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
 
   const playSound = (type: 'end' | 'warn' | 'switch') => {
     if (soundMode === 'mute') return;
-    
-    // Logic: 'alarms-only' only plays 'end'. 'all' plays everything.
     if (soundMode === 'alarms-only' && type !== 'end') return;
 
     try {
@@ -74,29 +140,42 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     }
   };
 
+  // --- Timer Tick ---
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = window.setInterval(() => {
-        setTimeLeft((prev) => {
-          const now = prev - 1;
+        if (endTimeRef.current) {
+          // Precise calculation using Start/End Time to avoid drift
+          const now = Date.now();
+          const remaining = Math.ceil((endTimeRef.current - now) / 1000);
+          
+          // Notifications Logic
           const halfTime = Math.ceil(totalTime / 2);
-
-          if (now === halfTime + 10 && !notifiedWarnRef.current) {
+          
+          if (remaining === halfTime + 10 && !notifiedWarnRef.current) {
             triggerNotification(t(lang, 'timer.warnTitle'), t(lang, 'timer.warnBody'), 'warn');
             notifiedWarnRef.current = true;
           }
 
-          if (now === halfTime && !notifiedSwitchRef.current) {
+          if (remaining === halfTime && !notifiedSwitchRef.current) {
             triggerNotification(t(lang, 'timer.switchTitle'), t(lang, 'timer.switchBody'), 'switch');
             notifiedSwitchRef.current = true;
           }
 
-          if (now <= 0) {
-            handleComplete();
-            return 0;
+          if (remaining <= 0) {
+             // End
+             setTimeLeft(0);
+             handleComplete();
+          } else {
+             setTimeLeft(remaining);
+             // We don't need to save to localStorage every second (perf), 
+             // but 'endTime' is already saved so refresh works automatically.
           }
-          return now;
-        });
+
+        } else {
+           // Fallback (shouldn't happen with new logic)
+           setTimeLeft(prev => prev - 1);
+        }
       }, 1000);
     } else {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
@@ -105,24 +184,33 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   }, [isRunning, totalTime, lang, soundMode]);
 
   const handleComplete = () => {
-    setTimeLeft(0);
     setIsRunning(false);
+    endTimeRef.current = null;
     if (intervalRef.current) window.clearInterval(intervalRef.current);
     triggerNotification(t(lang, 'timer.notificationTitle'), t(lang, 'timer.notificationBody'), 'end');
+    saveState(false, null, 0, totalTime);
   };
 
   const handleStart = () => {
     resetNotificationRefs();
+    const now = Date.now();
+    const targetEndTime = now + (timeLeft * 1000);
+    
+    endTimeRef.current = targetEndTime;
     setIsRunning(true);
     
-    const remaining = timeLeft;
+    // Check if we need to restore notification flags if restarting mid-way
     const halfTime = Math.ceil(totalTime / 2);
-    if (remaining < halfTime + 10) notifiedWarnRef.current = true;
-    if (remaining < halfTime) notifiedSwitchRef.current = true;
+    if (timeLeft < halfTime + 10) notifiedWarnRef.current = true;
+    if (timeLeft < halfTime) notifiedSwitchRef.current = true;
+
+    saveState(true, targetEndTime, timeLeft, totalTime);
   };
 
   const handlePause = () => {
     setIsRunning(false);
+    endTimeRef.current = null;
+    saveState(false, null, timeLeft, totalTime);
   };
 
   const handleReset = () => {
@@ -130,13 +218,16 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     setIsRunning(false);
     setTotalTime(newDuration);
     setTimeLeft(newDuration);
+    endTimeRef.current = null;
     resetNotificationRefs();
+    saveState(false, null, newDuration, newDuration);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value);
     if (!isNaN(val) && val > 0) {
       onDurationChange(val);
+      // Logic inside useEffect will handle the state reset and save
     }
   };
 
@@ -156,11 +247,15 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
   let phaseText = t(lang, 'timer.speaker1');
   let phaseIcon = <Mic size={16} className="text-emerald-500" />;
   
-  if (timeLeft <= 10) {
+  if (timeLeft <= 10 && timeLeft > 0) {
     statusColor = "text-rose-500 animate-pulse";
     barColor = "bg-rose-500";
     phaseText = t(lang, 'timer.finishing');
     phaseIcon = <AlertCircle size={16} className="text-rose-500" />;
+  } else if (timeLeft === 0) {
+    statusColor = "text-rose-500";
+    barColor = "bg-rose-500";
+    phaseText = "Done";
   } else if (isSecondHalf) {
     statusColor = "text-amber-400";
     barColor = "bg-amber-500";

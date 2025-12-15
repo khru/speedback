@@ -14,7 +14,15 @@ import { t } from './constants/translations';
 
 // Simple UUID generator fallback
 const generateId = () => Math.random().toString(36).substr(2, 9);
-const STORAGE_KEY = 'speedback_local_session_v1';
+const STORAGE_KEY = 'speedback_app_state_v2';
+
+interface AppState {
+  members: Member[];
+  rounds: Round[];
+  lang: Language;
+  sessionDurationMinutes: number;
+  soundMode: SoundMode;
+}
 
 function App() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -22,6 +30,7 @@ function App() {
   const [lang, setLang] = useState<Language>('en');
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState(5);
   const [soundMode, setSoundMode] = useState<SoundMode>('all');
+  const [isLoaded, setIsLoaded] = useState(false);
   
   // UI State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -33,20 +42,31 @@ function App() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setMembers(parsed.members || []);
-        setRounds(parsed.rounds || []);
+        const parsed: AppState = JSON.parse(saved);
+        if (parsed.members) setMembers(parsed.members);
+        if (parsed.rounds) setRounds(parsed.rounds);
+        if (parsed.lang) setLang(parsed.lang);
+        if (parsed.sessionDurationMinutes) setSessionDurationMinutes(parsed.sessionDurationMinutes);
+        if (parsed.soundMode) setSoundMode(parsed.soundMode);
       } catch (e) {
         console.error("Failed to load local data", e);
       }
     }
+    setIsLoaded(true);
   }, []);
 
   // Save to local storage on change
   useEffect(() => {
-    const data = { members, rounds };
+    if (!isLoaded) return; // Prevent overwriting with empty state before load
+    const data: AppState = { 
+      members, 
+      rounds, 
+      lang, 
+      sessionDurationMinutes, 
+      soundMode 
+    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [members, rounds]);
+  }, [members, rounds, lang, sessionDurationMinutes, soundMode, isLoaded]);
 
   // --- Actions ---
 
