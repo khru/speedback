@@ -1,31 +1,28 @@
-const CACHE_NAME = 'speedback-cache-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon.svg',
+const CACHE_NAME = 'speedback-v2';
+const ASSETS = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon.svg',
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap'
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      // Intentamos cachear lo crítico, si algo falla (como cdn externo offline), no rompemos la instalación
+      return cache.addAll(ASSETS).catch(err => console.warn('Algunos assets no se pudieron cachear en install:', err));
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       );
     })
   );
@@ -33,27 +30,25 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Ignorar peticiones que no son http/https (como chrome-extension://)
-  if (!event.request.url.startsWith('http')) return;
+  // Solo interceptamos GET http/https
+  if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      // Estrategia: Stale-While-Revalidate
-      // Devuelve la cache si existe, pero busca en la red para actualizar la cache en el fondo
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        // Si la respuesta es válida, clonarla y guardarla en cache
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // Fallback offline si es necesario (opcional)
-      });
+    caches.match(event.request).then((cached) => {
+      // Estrategia Stale-While-Revalidate: Devuelve caché rápido, actualiza en segundo plano
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Si falla la red, no hacemos nada extra, ya devolvimos caché o fallará la promesa
+        });
 
-      return cachedResponse || fetchPromise;
+      return cached || fetchPromise;
     })
   );
 });
