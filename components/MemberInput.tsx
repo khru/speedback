@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { UserPlus, ArrowRight, Users } from 'lucide-react';
 import { Language } from '../types';
 import { t } from '../constants/translations';
+import { sanitizeInput } from '../utils/security';
 
 interface MemberInputProps {
   onAdd: (name: string) => void;
@@ -25,7 +26,14 @@ export const MemberInput: React.FC<MemberInputProps> = ({ onAdd, lang }) => {
     if (e) e.preventDefault();
     if (name.trim()) {
       const names = name.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
-      names.forEach(n => onAdd(n));
+      
+      names.forEach(n => {
+        const cleanName = sanitizeInput(n);
+        if (cleanName) {
+            onAdd(cleanName);
+        }
+      });
+      
       setName('');
       if (textareaRef.current) {
         textareaRef.current.style.height = `${BASE_HEIGHT}px`;

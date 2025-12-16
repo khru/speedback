@@ -1,4 +1,4 @@
-const CACHE_NAME = 'speedback-v4';
+const CACHE_NAME = 'speedback-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -46,7 +46,6 @@ self.addEventListener('fetch', (event) => {
 
           // Determine if we should cache this response
           const url = new URL(event.request.url);
-          const isSameOrigin = location.origin === url.origin;
           
           // We want to cache:
           // 1. Basic requests (our own files)
@@ -66,7 +65,6 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // Network failure fallback
-          // If needed, we could return a custom offline page here for navigations
         });
 
       return cached || fetchPromise;

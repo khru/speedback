@@ -180,15 +180,15 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOp
             ]
           },
           {
-            title: "Anti-patrones (EVITAR)",
+            title: "Anti-patrones (AVOID)",
             icon: AlertTriangle,
             isWarning: true,
             color: "text-red-600",
             items: [
-              { title: "“Lo digo por tu bien”", desc: "Paternalista. Mejor explica el impacto real en el trabajo." },
-              { title: "Sándwich", desc: "Elogio falso + Crítica + Elogio falso. Diluye el mensaje y genera desconfianza." },
-              { title: "Acumular", desc: "No guardes una lista de errores para soltarlos todos en la evaluación anual." },
-              { title: "Psicoanálisis", desc: "No intentes adivinar por qué es así. Habla de lo que hace, no de lo que es." }
+              { title: "“For your own good”", desc: "Paternalista. Mejor explica el impacto real en el trabajo." },
+              { title: "The Sandwich", desc: "Fake praise + Criticism + Fake praise. Dilutes message and breeds mistrust." },
+              { title: "Hoarding", desc: "Don't save a list of errors to dump them all at the annual review." },
+              { title: "Psychoanalysis", desc: "Don't guess why they are that way. Talk about what they do, not what they are." }
             ]
           }
         ]
@@ -365,7 +365,7 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOp
   const currentContent = content[lang][activeTab];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white md:rounded-2xl shadow-2xl w-full md:max-w-5xl h-[100dvh] md:h-[85vh] flex flex-col md:flex-row overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Sidebar / Tabs Column */}

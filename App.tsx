@@ -12,6 +12,7 @@ import { InstallPWA } from './components/InstallPWA';
 import { generateRotationSchedule } from './services/rotationService';
 import { Member, Round, Language, SoundMode } from './types';
 import { t } from './constants/translations';
+import { sanitizeInput, sanitizeForCSV } from './utils/security';
 
 // Robust ID generator
 const generateId = () => {
@@ -55,7 +56,7 @@ function App() {
     if (urlMembers) {
       // 1. Priority: URL Params (Room Link)
       try {
-        const names = urlMembers.split(',').map(n => n.trim()).filter(n => n.length > 0);
+        const names = urlMembers.split(',').map(n => sanitizeInput(n.trim())).filter(n => n.length > 0);
         if (names.length > 0) {
           const newMembers = names.map(name => ({ id: generateId(), name }));
           setMembers(newMembers);
@@ -117,7 +118,7 @@ function App() {
   // --- Actions ---
 
   const addMember = (name: string) => {
-    const cleanName = name.trim();
+    const cleanName = sanitizeInput(name);
     if (!cleanName) return;
     
     setMembers(prevMembers => {
@@ -210,10 +211,10 @@ function App() {
     rounds.forEach(r => {
         const status = completedRounds.includes(r.roundNumber) ? 'Completed' : 'Pending';
         r.pairs.forEach(p => {
-            csv += `${r.roundNumber},${status},"${p.member1.name}","${p.member2.name}","Pair",""\n`;
+            csv += `${r.roundNumber},${status},"${sanitizeForCSV(p.member1.name)}","${sanitizeForCSV(p.member2.name)}","Pair",""\n`;
         });
         if (r.restingMember) {
-            csv += `${r.roundNumber},${status},"${r.restingMember.name}","","Rest",""\n`;
+            csv += `${r.roundNumber},${status},"${sanitizeForCSV(r.restingMember.name)}","","Rest",""\n`;
         }
     });
 
@@ -273,6 +274,14 @@ function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+           {members.length > 0 && (
+             <button
+               onClick={handleShare}
+               className={`p-2 rounded-full transition-all ${showCopiedToast ? 'bg-emerald-50 text-emerald-600' : 'text-zinc-500 hover:bg-zinc-100'}`}
+             >
+               {showCopiedToast ? <Check size={20} /> : <Share2 size={20} />}
+             </button>
+           )}
            <SoundMenu mode={soundMode} onChange={setSoundMode} lang={lang} />
         </div>
       </div>
@@ -318,37 +327,7 @@ function App() {
         {/* Action Area */}
         <div className="p-6 bg-white border-t border-zinc-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] z-10 pb-8 md:pb-6 safe-bottom space-y-3">
           
-          {members.length > 0 && (
-            <div>
-              <button
-                onClick={handleShare}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold text-zinc-600 bg-zinc-50 hover:bg-zinc-100 hover:text-zinc-900 border border-zinc-200 rounded-xl transition-all relative overflow-hidden"
-              >
-                {showCopiedToast ? (
-                  <>
-                    <Check size={14} className="text-emerald-500" />
-                    <span className="text-emerald-600">{t(lang, 'common.linkCopied')}</span>
-                  </>
-                ) : (
-                  <>
-                    <Share2 size={14} />
-                    {t(lang, 'common.share')}
-                  </>
-                )}
-              </button>
-              <div className="flex items-start gap-1.5 mt-2 px-1">
-                 <Info size={10} className="text-zinc-400 mt-0.5 shrink-0" />
-                 <p className="text-[10px] text-zinc-400 leading-tight">
-                   {t(lang, 'common.shareHint')}
-                 </p>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-             <InstallPWA lang={lang} variant="mobile" className="!mb-0 !w-full" />
-             <div className="hidden md:block"></div> {/* Spacer on desktop if needed, or modify layout */}
-          </div>
+          <InstallPWA lang={lang} variant="mobile" className="!mb-0 !w-full" />
           
           <button
             onClick={handleGenerate}
@@ -376,8 +355,23 @@ function App() {
               <InstallPWA lang={lang} variant="desktop" />
               
               <SoundMenu mode={soundMode} onChange={setSoundMode} lang={lang} />
-              
+
               <div className="w-px h-6 bg-zinc-200 mx-1"></div>
+
+              {members.length > 0 && (
+                <button
+                  onClick={handleShare}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    showCopiedToast 
+                      ? 'bg-emerald-50 text-emerald-600' 
+                      : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'
+                  }`}
+                  title={t(lang, 'common.share')}
+                >
+                  {showCopiedToast ? <Check size={14} /> : <Share2 size={14} />}
+                  <span>{showCopiedToast ? t(lang, 'common.linkCopied') : t(lang, 'common.share')}</span>
+                </button>
+              )}
 
               <button 
                 onClick={() => setIsGuideOpen(true)}
