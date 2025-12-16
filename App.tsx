@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Menu, Zap, Globe, BookOpen, FileText, Table2, X, Loader2 } from 'lucide-react';
+import { Sparkles, Menu, Zap, Globe, BookOpen, FileText, Table2, X, Loader2, Share2, Check } from 'lucide-react';
 
 import { MemberInput } from './components/MemberInput';
 import { MemberList } from './components/MemberList';
@@ -40,26 +40,59 @@ function App() {
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState(5);
   const [soundMode, setSoundMode] = useState<SoundMode>('all');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
   
   // UI State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
-  // Load initial state from LocalStorage
+  // Initialization Logic: URL Params > LocalStorage
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
+    const params = new URLSearchParams(window.location.search);
+    const urlMembers = params.get('members');
+
+    if (urlMembers) {
+      // 1. Priority: URL Params (Room Link)
       try {
-        const parsed: AppState = JSON.parse(saved);
-        if (parsed.members) setMembers(parsed.members);
-        if (parsed.rounds) setRounds(parsed.rounds);
-        if (parsed.completedRounds) setCompletedRounds(parsed.completedRounds);
-        if (parsed.lang) setLang(parsed.lang);
-        if (parsed.sessionDurationMinutes) setSessionDurationMinutes(parsed.sessionDurationMinutes);
-        if (parsed.soundMode) setSoundMode(parsed.soundMode);
+        const names = urlMembers.split(',').map(n => n.trim()).filter(n => n.length > 0);
+        if (names.length > 0) {
+          const newMembers = names.map(name => ({ id: generateId(), name }));
+          setMembers(newMembers);
+          // Initialize defaults for a fresh room
+          setRounds([]);
+          setCompletedRounds([]);
+          
+          // Clean URL so a refresh doesn't lock the state to the URL params forever
+          window.history.replaceState({}, '', window.location.pathname);
+          
+          // Optionally attempt to restore preferences like lang/sound from storage without overwriting members
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+             const parsed: AppState = JSON.parse(saved);
+             if (parsed.lang) setLang(parsed.lang);
+             if (parsed.soundMode) setSoundMode(parsed.soundMode);
+             // We deliberately ignore stored members/rounds in favor of the URL
+          }
+        }
       } catch (e) {
-        console.error("Failed to load local data", e);
+        console.error("Error parsing URL members", e);
+      }
+    } else {
+      // 2. Fallback: LocalStorage
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed: AppState = JSON.parse(saved);
+          if (parsed.members) setMembers(parsed.members);
+          if (parsed.rounds) setRounds(parsed.rounds);
+          if (parsed.completedRounds) setCompletedRounds(parsed.completedRounds);
+          if (parsed.lang) setLang(parsed.lang);
+          if (parsed.sessionDurationMinutes) setSessionDurationMinutes(parsed.sessionDurationMinutes);
+          if (parsed.soundMode) setSoundMode(parsed.soundMode);
+        } catch (e) {
+          console.error("Failed to load local data", e);
+        }
       }
     }
     // Small delay to ensure state is settled before allowing writes
@@ -123,6 +156,21 @@ function App() {
     setCompletedRounds([]); // Reset progress on new generation
     // On mobile, close menu after generating to show results
     setIsMobileMenuOpen(false);
+  };
+
+  const handleShare = async () => {
+    if (members.length === 0) return;
+    
+    const names = members.map(m => m.name).join(',');
+    const url = `${window.location.origin}${window.location.pathname}?members=${encodeURIComponent(names)}`;
+    
+    try {
+      await navigator.clipboard.writeText(url);
+      setShowCopiedToast(true);
+      setTimeout(() => setShowCopiedToast(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
   };
 
   const toggleRoundCompletion = (roundNum: number) => {
@@ -268,8 +316,31 @@ function App() {
         </div>
 
         {/* Action Area */}
-        <div className="p-6 bg-white border-t border-zinc-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] z-10 pb-8 md:pb-6 safe-bottom">
-          <InstallPWA lang={lang} variant="mobile" />
+        <div className="p-6 bg-white border-t border-zinc-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] z-10 pb-8 md:pb-6 safe-bottom space-y-3">
+          
+          {members.length > 0 && (
+            <button
+              onClick={handleShare}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold text-zinc-600 bg-zinc-50 hover:bg-zinc-100 hover:text-zinc-900 border border-zinc-200 rounded-xl transition-all relative overflow-hidden"
+            >
+              {showCopiedToast ? (
+                <>
+                  <Check size={14} className="text-emerald-500" />
+                  <span className="text-emerald-600">{t(lang, 'common.linkCopied')}</span>
+                </>
+              ) : (
+                <>
+                  <Share2 size={14} />
+                  {t(lang, 'common.share')}
+                </>
+              )}
+            </button>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+             <InstallPWA lang={lang} variant="mobile" className="!mb-0 !w-full" />
+             <div className="hidden md:block"></div> {/* Spacer on desktop if needed, or modify layout */}
+          </div>
           
           <button
             onClick={handleGenerate}

@@ -22,7 +22,9 @@ export const TRANSLATIONS = {
       close: "Close",
       exitRoom: "Exit Room",
       language: "Language",
-      install: "Install App"
+      install: "Install App",
+      share: "Share Room",
+      linkCopied: "Link copied to clipboard!"
     },
     room: {
       title: "Create Feedback Room",
@@ -100,7 +102,9 @@ export const TRANSLATIONS = {
       close: "Cerrar",
       exitRoom: "Salir de Sala",
       language: "Idioma",
-      install: "Instalar App"
+      install: "Instalar App",
+      share: "Compartir Sala",
+      linkCopied: "¡Enlace copiado al portapapeles!"
     },
     room: {
       title: "Crear Sala de Feedback",
