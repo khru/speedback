@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Shield, Zap, Rocket, Star, BookOpen, Brain, Heart, CheckCircle2, AlertTriangle, MessageCircle, Clock, Target, ThumbsUp, Microscope, Gift } from 'lucide-react';
+import { X, Shield, Zap, Rocket, Star, BookOpen, Brain, Heart, CheckCircle2, AlertTriangle, MessageCircle, Clock, ThumbsUp, Microscope, Gift, Info } from 'lucide-react';
 import { Language } from '../types';
 import { t } from '../constants/translations';
 
@@ -9,7 +9,7 @@ interface RecommendationsModalProps {
   lang: Language;
 }
 
-type TabType = 'hybrid' | 'performance' | 'safety' | 'tactical' | 'mindset';
+type TabType = 'concept' | 'hybrid' | 'performance' | 'safety' | 'tactical' | 'mindset';
 
 interface SectionItem {
   title: string;
@@ -31,12 +31,47 @@ interface TabContent {
 }
 
 export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOpen, onClose, lang }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('hybrid');
+  const [activeTab, setActiveTab] = useState<TabType>('concept');
 
   if (!isOpen) return null;
 
   const content: Record<Language, Record<TabType, TabContent>> = {
     es: {
+      concept: {
+        title: "¿Qué es una sesión Speedback?",
+        desc: "Una técnica ágil inspirada en el 'speed dating' para normalizar el feedback continuo.",
+        sections: [
+          {
+            title: "El Concepto",
+            icon: Info,
+            color: "text-blue-600",
+            items: [
+              { title: "¿Qué es?", desc: "Speedback es una técnica inspirada en el formato de citas rápidas. Las personas se unen a una sesión donde tienen conversaciones breves y cronometradas con varios colegas para dar y recibir feedback." },
+              { title: "El Objetivo", desc: "En lugar de reuniones largas e incómodas, se usan ciclos cortos. El objetivo es reducir el miedo, hacer del feedback un hábito y recopilar muchas perspectivas en poco tiempo." }
+            ]
+          },
+          {
+            title: "Cómo funciona",
+            icon: Clock,
+            color: "text-violet-600",
+            items: [
+              { title: "1. Preparación", desc: "Los participantes preparan notas breves: algo que la persona hace bien y algo que podría mejorar." },
+              { title: "2. La Pareja", desc: "Dos personas se juntan y ponen el temporizador (2-5 min). Uno da feedback, el otro escucha. Luego cambian." },
+              { title: "3. Rotación", desc: "Cuando terminan, rotan con un nuevo compañero y repiten el ciclo. Al final, se reflexiona sobre patrones." }
+            ]
+          },
+          {
+            title: "¿Por qué ayuda?",
+            icon: Heart,
+            color: "text-rose-600",
+            items: [
+              { title: "Menos intimidante", desc: "Hace que el feedback sea rápido y ligero. Se siente como apoyo natural en lugar de una evaluación estresante." },
+              { title: "Patrones y Puntos Ciegos", desc: "Recibir aportes de varios colegas ayuda a notar fortalezas repetidas y áreas de mejora que no veías." },
+              { title: "Cultura", desc: "Fomenta una cultura donde hablar de mejora es normal y seguro." }
+            ]
+          }
+        ]
+      },
       hybrid: {
         title: "Fundamentos y Preparación",
         desc: "Antes de hablar: mentalidad, preparación y respeto.",
@@ -174,9 +209,9 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOp
             icon: Brain,
             color: "text-purple-600",
             items: [
-              { title: "Escucha activo", desc: "Apaga tu voz interna defensiva. Escucha para entender." },
-              { title: "Agradece", desc: "Alguien ha dedicado tiempo a ayudarte. “Gracias” es la mejor respuesta." },
-              { title: "Ownership", desc: "No busques excusas. Toma lo que te sirve y comprométete a probar." }
+              { title: "Active listening", desc: "Turn off your internal defensive voice. Listen to understand." },
+              { title: "Thank you", desc: "Someone took time to help you. “Thank you” is the best response." },
+              { title: "Ownership", desc: "Don't make excuses. Take what is useful and commit to trying." }
             ]
           },
           {
@@ -195,6 +230,41 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOp
       }
     },
     en: {
+      concept: {
+        title: "What is Speedback?",
+        desc: "A technique inspired by speed dating to make feedback a natural habit.",
+        sections: [
+          {
+            title: "The Concept",
+            icon: Info,
+            color: "text-blue-600",
+            items: [
+              { title: "What is it?", desc: "Speedback is a technique inspired by speed dating. People join a session for short, timed conversations with several colleagues to give and receive feedback quickly." },
+              { title: "The Goal", desc: "Instead of long, uncomfortable meetings, teams use short cycles. The goal is to reduce fear, make feedback a habit, and gather many perspectives in a short time." }
+            ]
+          },
+          {
+            title: "How it works",
+            icon: Clock,
+            color: "text-violet-600",
+            items: [
+              { title: "1. Preparation", desc: "Participants prepare notes: something the person does well and something they could improve." },
+              { title: "2. The Pair", desc: "Two people pair up and set a timer (2-5 mins). One speaks, one listens. Then switch roles." },
+              { title: "3. Rotation", desc: "When done, everyone rotates to a new partner and repeats. At the end, reflect on patterns." }
+            ]
+          },
+          {
+            title: "Why it helps",
+            icon: Heart,
+            color: "text-rose-600",
+            items: [
+              { title: "Less Intimidating", desc: "It makes feedback faster and lighter. It feels like natural support rather than a stressful evaluation." },
+              { title: "Patterns & Blind Spots", desc: "Receiving input from several colleagues helps you notice repeated strengths and blind spots." },
+              { title: "Culture", desc: "It encourages a culture where feedback is normal and supportive." }
+            ]
+          }
+        ]
+      },
       hybrid: {
         title: "Foundations & Preparation",
         desc: "Before speaking: mindset, preparation, and respect.",
@@ -355,6 +425,7 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOp
   };
 
   const tabs = [
+    { id: 'concept', icon: Info, label: lang === 'es' ? '¿Qué es?' : 'What is it?', color: 'text-blue-500', bg: 'bg-blue-500' },
     { id: 'hybrid', icon: Star, label: lang === 'es' ? 'Fundamentos' : 'Foundations', color: 'text-amber-500', bg: 'bg-amber-500' },
     { id: 'performance', icon: Rocket, label: lang === 'es' ? 'Estructura' : 'Structure', color: 'text-violet-500', bg: 'bg-violet-500' },
     { id: 'safety', icon: Shield, label: lang === 'es' ? 'Seguridad' : 'Safety', color: 'text-emerald-500', bg: 'bg-emerald-500' },
