@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Menu, Zap, Globe, BookOpen, FileText, Table2, X } from 'lucide-react';
+import { Sparkles, Menu, Zap, Globe, BookOpen, FileText, Table2, X, Loader2 } from 'lucide-react';
 
 import { MemberInput } from './components/MemberInput';
 import { MemberList } from './components/MemberList';
@@ -13,8 +13,14 @@ import { generateRotationSchedule } from './services/rotationService';
 import { Member, Round, Language, SoundMode } from './types';
 import { t } from './constants/translations';
 
-// Simple UUID generator fallback
-const generateId = () => Math.random().toString(36).substr(2, 9);
+// Robust ID generator
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 9);
+};
+
 const STORAGE_KEY = 'speedback_app_state_v2';
 
 interface AppState {
@@ -56,12 +62,14 @@ function App() {
         console.error("Failed to load local data", e);
       }
     }
-    setIsLoaded(true);
+    // Small delay to ensure state is settled before allowing writes
+    setTimeout(() => setIsLoaded(true), 50);
   }, []);
 
   // Save to local storage on change
   useEffect(() => {
     if (!isLoaded) return; // Prevent overwriting with empty state before load
+    
     const data: AppState = { 
       members, 
       rounds, 
@@ -80,6 +88,7 @@ function App() {
     if (!cleanName) return;
     
     setMembers(prevMembers => {
+      // Avoid duplicates
       if (prevMembers.some(m => m.name.toLowerCase() === cleanName.toLowerCase())) {
         return prevMembers;
       }
@@ -178,6 +187,15 @@ function App() {
     setLang(prev => prev === 'en' ? 'es' : 'en');
   };
 
+  // Pre-load check to avoid flashing empty state before localStorage read
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+        <Loader2 className="animate-spin text-violet-600 w-8 h-8" />
+      </div>
+    );
+  }
+
   // APP VIEW
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row font-sans text-zinc-900 overflow-hidden">
@@ -196,7 +214,7 @@ function App() {
       />
 
       {/* MOBILE HEADER */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-zinc-200 sticky top-0 z-30 shadow-sm">
+      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-zinc-200 sticky top-0 z-30 shadow-sm safe-top">
         <div className="flex items-center gap-2">
           <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-zinc-600 hover:bg-zinc-100 rounded-lg">
             <Menu size={24} />
@@ -223,12 +241,12 @@ function App() {
       <aside className={`
         fixed md:static inset-y-0 left-0 z-50 w-[85%] max-w-[320px] md:w-80 lg:w-96 
         bg-white border-r border-zinc-200 flex flex-col shadow-2xl md:shadow-xl md:shadow-zinc-200/50 
-        transition-transform duration-300 ease-in-out
+        transition-transform duration-300 ease-in-out safe-left
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         
         {/* Sidebar Header */}
-        <div className="p-6 bg-white border-b border-zinc-100 flex justify-between items-start">
+        <div className="p-6 bg-white border-b border-zinc-100 flex justify-between items-start safe-top">
            <div className="flex items-center gap-2 text-violet-700">
               <Zap className="fill-current" size={24} />
               <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Speedback</h1>
@@ -250,7 +268,7 @@ function App() {
         </div>
 
         {/* Action Area */}
-        <div className="p-6 bg-white border-t border-zinc-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] z-10 pb-8 md:pb-6">
+        <div className="p-6 bg-white border-t border-zinc-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] z-10 pb-8 md:pb-6 safe-bottom">
           <InstallPWA lang={lang} variant="mobile" />
           
           <button
@@ -265,7 +283,7 @@ function App() {
       </aside>
 
       {/* MAIN CONTENT: Timer & Schedule */}
-      <main className="flex-grow flex flex-col h-[calc(100vh-65px)] md:h-screen overflow-hidden">
+      <main className="flex-grow flex flex-col h-[calc(100vh-65px)] md:h-screen overflow-hidden safe-right">
         
         {/* Desktop Header */}
         <header className="hidden md:flex flex-shrink-0 h-20 px-8 border-b border-zinc-200 bg-white/80 backdrop-blur-md items-center justify-between z-20 sticky top-0">

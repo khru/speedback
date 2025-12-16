@@ -1,9 +1,12 @@
 {
-  "name": "Speedback",
+  "id": "speedback-rotation-app",
+  "name": "Speedback - Feedback Rotativo",
   "short_name": "Speedback",
-  "start_url": "./",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
   "theme_color": "#ffffff",
   "description": "Herramienta profesional para sesiones de feedback rotativo.",
   "icons": [
