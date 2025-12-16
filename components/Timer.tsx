@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Timer as TimerIcon, Mic, RefreshCw, AlertCircle } from 'lucide-react';
+import { Play, Pause, RotateCcw, Timer as TimerIcon, Mic, RefreshCw, AlertCircle, Plus, Minus } from 'lucide-react';
 import { Language, SoundMode } from '../types';
 import { t } from '../constants/translations';
 
@@ -223,11 +223,22 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
     saveState(false, null, newDuration, newDuration);
   };
 
+  const incrementDuration = () => {
+    onDurationChange(Math.min(90, duration + 1));
+  };
+
+  const decrementDuration = () => {
+    onDurationChange(Math.max(1, duration - 1));
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value);
-    if (!isNaN(val) && val > 0) {
-      onDurationChange(val);
-      // Logic inside useEffect will handle the state reset and save
+    if (!isNaN(val)) {
+      onDurationChange(Math.max(1, Math.min(90, val)));
+    } else if (e.target.value === '') {
+       // Optional: Allow clearing temporarily if needed, 
+       // but for strict numeric props, usually keeping the previous value or not updating is safer.
+       // Here we rely on buttons for usability.
     }
   };
 
@@ -278,22 +289,38 @@ export const Timer: React.FC<TimerProps> = ({ duration, onDurationChange, lang, 
         </div>
         
         {!isRunning && (
-          <div className="flex items-center gap-2 bg-white/5 rounded-lg px-2 py-1">
-             <input 
-               type="number" 
-               min="1" 
-               max="60"
-               value={duration}
-               onChange={handleInputChange}
-               className="w-8 bg-transparent text-white text-right text-sm font-mono outline-none"
-             />
-             <span className="text-xs text-zinc-500 font-medium">{t(lang, 'timer.min')}</span>
+          <div className="flex items-center bg-black/30 rounded-lg p-0.5 border border-white/10">
+             <button 
+                onClick={decrementDuration}
+                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+             >
+                <Minus size={14} strokeWidth={3} />
+             </button>
+             
+             <div className="flex items-baseline px-2 gap-0.5 min-w-[3rem] justify-center">
+                <input 
+                  type="number" 
+                  min="1" 
+                  max="90"
+                  value={duration}
+                  onChange={handleInputChange}
+                  className="w-5 bg-transparent text-white text-center text-sm font-mono font-bold outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="text-[10px] text-zinc-500 font-bold uppercase">{t(lang, 'timer.min')}</span>
+             </div>
+
+             <button 
+                onClick={incrementDuration}
+                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+             >
+                <Plus size={14} strokeWidth={3} />
+             </button>
           </div>
         )}
       </div>
 
       <div className="text-center relative z-10 py-2">
-        <div className={`text-6xl md:text-7xl font-mono font-medium tracking-tighter ${statusColor} transition-colors duration-500`}>
+        <div className={`text-6xl md:text-7xl font-mono font-medium tracking-tighter ${statusColor} transition-colors duration-500 select-none`}>
           {formatTime(timeLeft)}
         </div>
         

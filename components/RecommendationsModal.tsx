@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Shield, Zap, Rocket, Star, BookOpen, Brain, Heart, CheckCircle2 } from 'lucide-react';
+import { X, Shield, Zap, Rocket, Star, BookOpen, Brain, Heart, CheckCircle2, AlertTriangle, MessageCircle, Clock, Target, ThumbsUp, Microscope, Gift } from 'lucide-react';
 import { Language } from '../types';
 import { t } from '../constants/translations';
 
@@ -11,179 +11,352 @@ interface RecommendationsModalProps {
 
 type TabType = 'hybrid' | 'performance' | 'safety' | 'tactical' | 'mindset';
 
+interface SectionItem {
+  title: string;
+  desc: string;
+}
+
+interface Section {
+  title: string;
+  icon?: any;
+  color?: string; // Tailwind text color class
+  items: SectionItem[];
+  isWarning?: boolean; // For Anti-patterns
+}
+
+interface TabContent {
+  title: string;
+  desc: string;
+  sections: Section[];
+}
+
 export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOpen, onClose, lang }) => {
   const [activeTab, setActiveTab] = useState<TabType>('hybrid');
 
   if (!isOpen) return null;
 
-  const content = {
+  const content: Record<Language, Record<TabType, TabContent>> = {
     es: {
       hybrid: {
-        title: "Manifiesto Speedback (Recomendado)",
-        desc: "Equilibrio entre rapidez y calidad humana. El estándar oficial.",
-        rules: [
-          { title: "Hechos sobre Sentimientos", desc: "No me digas qué soy, dime qué hice. Trae un dato concreto." },
-          { title: "Futuro sobre Pasado (Feedforward)", desc: "No te quejes de lo que ya pasó. Dame una idea para hacerlo mejor la próxima vez." },
-          { title: "El Candado", desc: "Quien recibe el feedback no puede debatir. Escucha, procesa y cierra con un 'Gracias'." }
-        ]
-      },
-      performance: {
-        title: "Alto Rendimiento",
-        desc: "Basado en Radical Candor. Crecimiento rápido sin rodeos.",
-        rules: [
-          { title: "Prohibido Generalizar", desc: "Nada de 'eres genial' o 'eres desorganizado'. Ejemplo específico obligatorio." },
-          { title: "La Fórmula SBI", desc: "Situación + Comportamiento (Behavior) + Impacto." },
-          { title: "Mata al 'Sándwich'", desc: "No escondas una crítica entre dos elogios falsos. Ve al punto." },
-          { title: "Escucha Activa", desc: "El receptor tiene prohibido defenderse. Su único trabajo es entender." }
-        ]
-      },
-      safety: {
-        title: "Seguridad Psicológica",
-        desc: "Basado en Comunicación No Violenta. Prioriza la relación humana.",
-        rules: [
-          { title: "Cámara de Video", desc: "Describe hechos (lo que graba una cámara), no juicios ('llegaste tarde' vs 'no te importa')." },
-          { title: "Habla desde el 'Yo'", desc: "Expresa cómo te sentiste tú, en lugar de acusar al otro." },
-          { title: "Peticiones, no Exigencias", desc: "Termina con una solicitud clara que se puede aceptar o rechazar." },
-          { title: "El Regalo", desc: "Quien recibe debe agradecer el riesgo que el otro ha tomado para ayudarle." }
-        ]
-      },
-      tactical: {
-        title: "Táctico & Veloz",
-        desc: "Eficiencia pura para sesiones cortas.",
-        rules: [
-          { title: "La Ley del Silencio", desc: "Mientras te dan feedback, es ilegal interrumpir o justificarse." },
-          { title: "La Salida Única", desc: "Al terminar, la única palabra permitida es: 'Gracias'." },
-          { title: "Regla del 10%", desc: "Asume que el 90% puede estar mal, pero busca el 10% de verdad que te sirve." },
-          { title: "Orientado a la Acción", desc: "Solo cosas que se puedan cambiar. No critiques personalidad." }
-        ]
-      },
-      mindset: {
-        title: "Mentalidad y Reglas de Oro",
-        desc: "Reglas de oro para asegurar que el feedback sea constructivo y bien recibido.",
-        pillars: [
+        title: "Fundamentos y Preparación",
+        desc: "Antes de hablar: mentalidad, preparación y respeto.",
+        sections: [
           {
-            title: "Pilar 1: Ownership (Mentalidad)",
-            icon: Shield,
-            color: "text-blue-600",
+            title: "Checklist de Vuelo (Antes de ir)",
+            icon: CheckCircle2,
+            color: "text-emerald-600",
             items: [
-              { title: "Mírate al espejo primero", text: "Antes de señalar un error, pregúntate: ¿He sido claro? ¿He dado apoyo?" },
-              { title: "Separa el Estímulo de la Respuesta", text: "No reacciones de inmediato. Usa el espacio entre la crítica y tu emoción para elegir una respuesta racional." },
-              { title: "Humildad, no Pasividad", text: "Escucha para entender. Si no estás de acuerdo, agradece y procesa antes de debatir." },
-              { title: "Céntrate en lo que Controlas", text: "Tú controlas tu mensaje, no la reacción del otro. No te frustres por lo que no depende de ti." }
+              { title: "1. Preparado", desc: "Tengo ejemplos concretos y recientes. No hablo de memoria." },
+              { title: "2. Temperatura", desc: "No voy 'en caliente' ni enfadado. Ha pasado poco tiempo, pero el suficiente para enfriar." },
+              { title: "3. Receptividad", desc: "¿Es buen momento para la otra persona? ¿Está abierta a recibirlo?" },
+              { title: "4. Intención", desc: "Voy a ayudar, no a descargar mi frustración." }
             ]
           },
           {
-            title: "Pilar 2: Comunicación Efectiva",
+            title: "Mentalidad",
+            icon: Gift,
+            color: "text-pink-600",
+            items: [
+              { title: "Es un Regalo", desc: "El feedback es un dato para que la otra persona mejore. Dalo con esa generosidad." },
+              { title: "El Espejo (Auto-feedback)", desc: "Antes de juzgar, pregúntate: ¿Qué podría haber hecho yo mejor para evitar esto? Empieza por ti." },
+              { title: "Digestión", desc: "Al recibir feedback, no reacciones al instante. Reflexiona, separa el 'dato' de la emoción y decide qué tomar." },
+              { title: "Intención Clara", desc: "“Te lo digo para que te vaya mejor, no para tener razón.”" }
+            ]
+          },
+          {
+            title: "Reglas de Respeto",
             icon: Heart,
             color: "text-rose-600",
             items: [
-              { title: "Observación vs Evaluación", text: "Usa el 'filtro de cámara'. Describe hechos observables, no juicios morales." },
-              { title: "Expresa Sentimientos Reales", text: "Di 'Me siento frustrado', no 'Siento que me ignoras' (eso es un juicio)." },
-              { title: "La Necesidad detrás", text: "Identifica qué necesitas (confianza, claridad, apoyo) y pídelo explícitamente." },
-              { title: "Peticiones Positivas", text: "No digas lo que NO quieres. Pide acciones concretas de lo que SÍ quieres que pase." }
+              { title: "Respeto tu tiempo", desc: "Voy al grano, pido permiso: “¿Tienes 2 minutos?”" },
+              { title: "Respeto tu trabajo", desc: "Critico el output (el resultado), no tu valor como persona." },
+              { title: "Respeto la verdad", desc: "Digo lo que veo (hechos), no lo que imagino (suposiciones)." }
             ]
           }
-        ],
-        cheatSheet: {
-          giver: [
-            "Hechos, no Opiniones: ¿Lo podría grabar una cámara?",
-            "Lenguaje Positivo: ¿Pido lo que quiero o me quejo?",
-            "Propósito: ¿Ayudo al equipo o me desahogo?"
-          ],
-          receiver: [
-            "Escudo Estoico: Separa lo que dicen de quién eres.",
-            "Propiedad Extrema: Busca el 1% de verdad.",
-            "Humildad: Escucha para entender, no para responder."
-          ]
-        }
+        ]
+      },
+      performance: {
+        title: "Modelos y Estructura",
+        desc: "Fórmulas probadas para dar feedback constructivo.",
+        sections: [
+          {
+            title: "Fórmula Corta (S.C.I.)",
+            icon: Rocket,
+            color: "text-violet-600",
+            items: [
+              { title: "Situación", desc: "“En la reunión de ayer…” (Contexto específico)." },
+              { title: "Conducta", desc: "“Cuando interrumpiste a X…” (Acción observable)." },
+              { title: "Impacto", desc: "“El equipo dejó de aportar ideas…” (Consecuencia real)." },
+              { title: "Futuro", desc: "“La próxima, ¿puedes dejar terminar antes de hablar?”" }
+            ]
+          },
+          {
+            title: "Feedback Positivo",
+            icon: ThumbsUp,
+            color: "text-emerald-600",
+            items: [
+              { title: "Sé específico", desc: "No digas “Buen trabajo”. Di: “La forma en que organizaste los datos ayudó a…”" },
+              { title: "Explica el porqué", desc: "Conecta la acción con el éxito del equipo o negocio." },
+              { title: "Hazlo transferible", desc: "“Esa calma bajo presión, úsala también en la demo con cliente.”" }
+            ]
+          }
+        ]
+      },
+      safety: {
+        title: "Seguridad Psicológica y Blameless",
+        desc: "Cómo corregir sin culpar y atacando al problema, no a la persona.",
+        sections: [
+          {
+            title: "Cultura Blameless (Sin Culpa)",
+            icon: Microscope,
+            color: "text-blue-600",
+            items: [
+              { title: "Acción observable vs. Persona", desc: "Describe lo que hizo (video), no cómo es (foto). Evita: “Eres desordenado”. Usa: “Los archivos no estaban en la carpeta”." },
+              { title: "Comportamiento vs. Valores", desc: "No ataques su identidad ni sus valores. Céntrate en la conducta visible." },
+              { title: "Sistémico", desc: "Asume que la persona quería hacerlo bien. ¿Falló el proceso? ¿La herramienta? ¿La instrucción?" }
+            ]
+          },
+          {
+            title: "Empatía y Firmeza",
+            icon: Shield,
+            color: "text-indigo-600",
+            items: [
+              { title: "Valida primero", desc: "“Entiendo que estabas bajo presión…”" },
+              { title: "Curiosidad", desc: "“¿Qué te llevó a tomar esa decisión?” (Pregunta genuina, no trampa)." },
+              { title: "Cuida el tono", desc: "Directo no es agresivo. Se puede ser firme y amable a la vez." }
+            ]
+          },
+          {
+            title: "No Violenta (Express)",
+            icon: MessageCircle,
+            color: "text-teal-600",
+            items: [
+              { title: "1. Hecho", desc: "Sin adjetivos. Solo datos." },
+              { title: "2. Sentimiento/Impacto", desc: "Cómo me afecta a mí o al proyecto." },
+              { title: "3. Necesidad", desc: "Lo que falta (claridad, tiempo, calidad)." },
+              { title: "4. Petición", desc: "Clara, positiva y realizable." }
+            ]
+          }
+        ]
+      },
+      tactical: {
+        title: "Táctica y Claridad",
+        desc: "Herramientas para asegurar que el mensaje llega limpio.",
+        sections: [
+          {
+            title: "Comunicación Clara",
+            icon: Zap,
+            color: "text-amber-600",
+            items: [
+              { title: "Hechos, no etiquetas", desc: "“Llegaste 10 min tarde” (Hecho). “Eres impuntual” (Etiqueta)." },
+              { title: "Concreto > General", desc: "Evita “Siempre” o “Nunca”. Cita el evento específico." },
+              { title: "Cierra el bucle", desc: "“¿Qué te llevas de esto?” o “¿Cómo lo ves tú?”" }
+            ]
+          },
+          {
+            title: "Cuándo y Dónde",
+            icon: Clock,
+            color: "text-slate-600",
+            items: [
+              { title: "Rápido", desc: "Cuanto antes mejor, pero asegúrate de estar calmado." },
+              { title: "Privado", desc: "La corrección siempre en privado. El elogio puede ser público." },
+              { title: "Directo", desc: "No uses intermediarios. Habla con la persona, no de la persona." }
+            ]
+          }
+        ]
+      },
+      mindset: {
+        title: "Mentalidad y Anti-patrones",
+        desc: "Cómo recibir feedback y qué errores evitar.",
+        sections: [
+          {
+            title: "Cómo recibir feedback",
+            icon: Brain,
+            color: "text-purple-600",
+            items: [
+              { title: "Escucha activo", desc: "Apaga tu voz interna defensiva. Escucha para entender." },
+              { title: "Agradece", desc: "Alguien ha dedicado tiempo a ayudarte. “Gracias” es la mejor respuesta." },
+              { title: "Ownership", desc: "No busques excusas. Toma lo que te sirve y comprométete a probar." }
+            ]
+          },
+          {
+            title: "Anti-patrones (EVITAR)",
+            icon: AlertTriangle,
+            isWarning: true,
+            color: "text-red-600",
+            items: [
+              { title: "“Lo digo por tu bien”", desc: "Paternalista. Mejor explica el impacto real en el trabajo." },
+              { title: "Sándwich", desc: "Elogio falso + Crítica + Elogio falso. Diluye el mensaje y genera desconfianza." },
+              { title: "Acumular", desc: "No guardes una lista de errores para soltarlos todos en la evaluación anual." },
+              { title: "Psicoanálisis", desc: "No intentes adivinar por qué es así. Habla de lo que hace, no de lo que es." }
+            ]
+          }
+        ]
       }
     },
     en: {
       hybrid: {
-        title: "Speedback Manifesto (Recommended)",
-        desc: "Balance between speed and human quality. The official standard.",
-        rules: [
-          { title: "Facts over Feelings", desc: "Don't tell me what I am, tell me what I did. Bring concrete data." },
-          { title: "Future over Past (Feedforward)", desc: "Don't complain about the past. Give me an idea to do better next time." },
-          { title: "The Lock", desc: "The receiver cannot debate. Listen, process, and close with a 'Thank you'." }
-        ]
-      },
-      performance: {
-        title: "High Performance",
-        desc: "Based on Radical Candor. Fast growth without fluff.",
-        rules: [
-          { title: "No Generalizations", desc: "No 'you are great' or 'you are messy'. Specific examples are mandatory." },
-          { title: "The SBI Formula", desc: "Situation + Behavior + Impact." },
-          { title: "Kill the 'Sandwich'", desc: "Don't hide criticism between two fake compliments. Get to the point." },
-          { title: "Active Listening", desc: "The receiver is forbidden to defend themselves. Their only job is to understand." }
-        ]
-      },
-      safety: {
-        title: "Psychological Safety",
-        desc: "Based on Non-Violent Communication. Prioritizes human connection.",
-        rules: [
-          { title: "Video Camera", desc: "Describe facts (what a camera records), not judgments ('you were late' vs 'you don't care')." },
-          { title: "Speak from 'I'", desc: "Express how you felt, rather than accusing the other person." },
-          { title: "Requests, not Demands", desc: "End with a clear request that can be accepted or rejected." },
-          { title: "The Gift", desc: "The receiver must thank the other for the risk taken to help them." }
-        ]
-      },
-      tactical: {
-        title: "Tactical & Fast",
-        desc: "Pure efficiency for short sessions.",
-        rules: [
-          { title: "The Law of Silence", desc: "While receiving feedback, it is illegal to interrupt or justify yourself." },
-          { title: "The Single Exit", desc: "When finished, the only allowed word is: 'Thank you'." },
-          { title: "The 10% Rule", desc: "Assume 90% might be wrong, but look for the 10% of truth that helps you." },
-          { title: "Action Oriented", desc: "Only things that can be changed. Do not criticize personality." }
-        ]
-      },
-      mindset: {
-        title: "Mindset & Golden Rules",
-        desc: "Core principles to ensure feedback is constructive and well-received.",
-        pillars: [
+        title: "Foundations & Preparation",
+        desc: "Before speaking: mindset, preparation, and respect.",
+        sections: [
           {
-            title: "Pillar 1: Ownership (Mindset)",
-            icon: Shield,
-            color: "text-blue-600",
+            title: "Pre-flight Checklist",
+            icon: CheckCircle2,
+            color: "text-emerald-600",
             items: [
-              { title: "Mirror First", text: "Before pointing out an error, ask: Was I clear? Did I provide support?" },
-              { title: "Separate Stimulus from Response", text: "Don't react immediately. Use the gap between criticism and emotion to choose a rational response." },
-              { title: "Humility, not Passivity", text: "Listen to understand. If you disagree, thank them and process before debating." },
-              { title: "Focus on Control", text: "You control your message, not their reaction. Don't get frustrated by what isn't yours." }
+              { title: "1. Prepared", desc: "I have concrete, recent examples. Not speaking from vague memory." },
+              { title: "2. Temperature", desc: "I am not 'heated' or angry. Enough time has passed to cool down." },
+              { title: "3. Receptivity", desc: "Is the recipient ready? Are they open to hearing this now?" },
+              { title: "4. Intention", desc: "I am here to help, not to vent my frustration." }
             ]
           },
           {
-            title: "Pillar 2: Effective Communication",
+            title: "Mindset",
+            icon: Gift,
+            color: "text-pink-600",
+            items: [
+              { title: "Feedback is a Gift", desc: "It's data to help the other person grow. Give it with generosity." },
+              { title: "The Mirror (Self-feedback)", desc: "What could I have done better? Before judging, review your own responsibility." },
+              { title: "Digestion", desc: "Don't react instantly. Take time to process what you received and separate data from emotion." },
+              { title: "Clear Intention", desc: "“I'm telling you this so you can improve, not to be right.”" }
+            ]
+          },
+          {
+            title: "Rules of Respect",
             icon: Heart,
             color: "text-rose-600",
             items: [
-              { title: "Observation vs Evaluation", text: "Use the 'camera filter'. Describe observable facts, not moral judgments." },
-              { title: "Express Real Feelings", text: "Say 'I feel frustrated', not 'I feel like you ignore me' (that's a judgment)." },
-              { title: "The Need Behind", text: "Identify what you need (trust, clarity, support) and ask for it explicitly." },
-              { title: "Positive Requests", text: "Don't say what you DON'T want. Ask for concrete actions of what you DO want." }
+              { title: "Respect time", desc: "Get to the point. Ask permission: “Do you have 2 minutes?”" },
+              { title: "Respect work", desc: "Critique the output, not their value as a person." },
+              { title: "Respect truth", desc: "Say what you see (facts), not what you imagine (assumptions)." }
             ]
           }
-        ],
-        cheatSheet: {
-          giver: [
-            "Facts, not Opinions: Could a camera record it?",
-            "Positive Language: Am I asking for what I want?",
-            "Purpose: Am I helping the team or venting?"
-          ],
-          receiver: [
-            "Stoic Shield: Separate words from self-worth.",
-            "Extreme Ownership: Find the 1% of truth.",
-            "Humility: Listen to understand, not to respond."
-          ]
-        }
+        ]
+      },
+      performance: {
+        title: "Models & Structure",
+        desc: "Proven formulas for constructive feedback.",
+        sections: [
+          {
+            title: "Short Formula (S.B.I.)",
+            icon: Rocket,
+            color: "text-violet-600",
+            items: [
+              { title: "Situation", desc: "“In yesterday's meeting…” (Specific context)." },
+              { title: "Behavior", desc: "“When you interrupted X…” (Observable action)." },
+              { title: "Impact", desc: "“The team stopped sharing ideas…” (Real consequence)." },
+              { title: "Future", desc: "“Next time, could you let them finish before speaking?”" }
+            ]
+          },
+          {
+            title: "Positive Feedback",
+            icon: ThumbsUp,
+            color: "text-emerald-600",
+            items: [
+              { title: "Be specific", desc: "Don't say “Good job”. Say: “The way you organized the data helped to…”" },
+              { title: "Explain why", desc: "Connect the action to team or business success." },
+              { title: "Make it transferable", desc: "“That calmness under pressure, use it in the client demo too.”" }
+            ]
+          }
+        ]
+      },
+      safety: {
+        title: "Psychological Safety & Blameless",
+        desc: "Correcting without blaming; attacking the problem, not the person.",
+        sections: [
+          {
+            title: "Blameless Culture",
+            icon: Microscope,
+            color: "text-blue-600",
+            items: [
+              { title: "Observable Action vs. Person", desc: "Describe what they did (video), not how they are (photo). Avoid: “You are messy”. Use: “Files were not in the folder”." },
+              { title: "Behavior vs. Values", desc: "Do not attack their identity or values. Focus on visible conduct." },
+              { title: "Systemic", desc: "Assume they wanted to do well. Did the process fail? The tool? The instruction?" }
+            ]
+          },
+          {
+            title: "Empathy & Firmness",
+            icon: Shield,
+            color: "text-indigo-600",
+            items: [
+              { title: "Validate first", desc: "“I understand you were under pressure…”" },
+              { title: "Curiosity", desc: "“What led you to that decision?” (Genuine question, not a trap)." },
+              { title: "Watch the tone", desc: "Direct is not aggressive. You can be firm and kind simultaneously." }
+            ]
+          },
+          {
+            title: "Non-Violent (Express)",
+            icon: MessageCircle,
+            color: "text-teal-600",
+            items: [
+              { title: "1. Fact", desc: "No adjectives. Just data." },
+              { title: "2. Feeling/Impact", desc: "How it affects me or the project." },
+              { title: "3. Need", desc: "What is missing (clarity, time, quality)." },
+              { title: "4. Request", desc: "Clear, positive, and doable." }
+            ]
+          }
+        ]
+      },
+      tactical: {
+        title: "Tactics & Clarity",
+        desc: "Tools to ensure the message lands cleanly.",
+        sections: [
+          {
+            title: "Clear Communication",
+            icon: Zap,
+            color: "text-amber-600",
+            items: [
+              { title: "Facts, not labels", desc: "“You arrived 10 min late” (Fact). “You are unpunctual” (Label)." },
+              { title: "Concrete > General", desc: "Avoid “Always” or “Never”. Cite the specific event." },
+              { title: "Close the loop", desc: "“What is your takeaway?” or “How do you see it?”" }
+            ]
+          },
+          {
+            title: "When and Where",
+            icon: Clock,
+            color: "text-slate-600",
+            items: [
+              { title: "Fast", desc: "Sooner is better, but ensure you are calm." },
+              { title: "Private", desc: "Correction always in private. Praise can be public." },
+              { title: "Direct", desc: "No triangulation. Speak to the person, not about the person." }
+            ]
+          }
+        ]
+      },
+      mindset: {
+        title: "Mindset & Anti-patterns",
+        desc: "How to receive feedback and what errors to avoid.",
+        sections: [
+          {
+            title: "How to Receive Feedback",
+            icon: Brain,
+            color: "text-purple-600",
+            items: [
+              { title: "Active listening", desc: "Turn off your internal defensive voice. Listen to understand." },
+              { title: "Thank you", desc: "Someone took time to help you. “Thank you” is the best response." },
+              { title: "Ownership", desc: "Don't make excuses. Take what is useful and commit to trying." }
+            ]
+          },
+          {
+            title: "Anti-patterns (AVOID)",
+            icon: AlertTriangle,
+            isWarning: true,
+            color: "text-red-600",
+            items: [
+              { title: "“For your own good”", desc: "Patronizing. Better to explain the real impact on work." },
+              { title: "The Sandwich", desc: "Fake praise + Criticism + Fake praise. Dilutes message and breeds mistrust." },
+              { title: "Hoarding", desc: "Don't save a list of errors to dump them all at the annual review." },
+              { title: "Psychoanalysis", desc: "Don't guess why they are that way. Talk about what they do, not what they are." }
+            ]
+          }
+        ]
       }
     }
   };
 
   const tabs = [
-    { id: 'hybrid', icon: Star, label: lang === 'es' ? 'Manifiesto' : 'Manifesto', color: 'text-amber-500', bg: 'bg-amber-500' },
-    { id: 'performance', icon: Rocket, label: lang === 'es' ? 'Rendimiento' : 'Performance', color: 'text-violet-500', bg: 'bg-violet-500' },
+    { id: 'hybrid', icon: Star, label: lang === 'es' ? 'Fundamentos' : 'Foundations', color: 'text-amber-500', bg: 'bg-amber-500' },
+    { id: 'performance', icon: Rocket, label: lang === 'es' ? 'Estructura' : 'Structure', color: 'text-violet-500', bg: 'bg-violet-500' },
     { id: 'safety', icon: Shield, label: lang === 'es' ? 'Seguridad' : 'Safety', color: 'text-emerald-500', bg: 'bg-emerald-500' },
     { id: 'tactical', icon: Zap, label: lang === 'es' ? 'Táctico' : 'Tactical', color: 'text-blue-500', bg: 'bg-blue-500' },
     { id: 'mindset', icon: Brain, label: lang === 'es' ? 'Mentalidad' : 'Mindset', color: 'text-pink-500', bg: 'bg-pink-500' },
@@ -192,31 +365,50 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOp
   const currentContent = content[lang][activeTab];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col md:flex-row overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white md:rounded-2xl shadow-2xl w-full md:max-w-5xl h-[100dvh] md:h-[85vh] flex flex-col md:flex-row overflow-hidden animate-in zoom-in-95 duration-200">
         
-        {/* Sidebar / Tabs */}
-        <div className="w-full md:w-64 bg-zinc-50 border-r border-zinc-200 flex-shrink-0 flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible">
+        {/* Sidebar / Tabs Column */}
+        <div className="w-full md:w-64 bg-zinc-50 border-r border-zinc-200 flex-shrink-0 flex flex-col">
+          
+          {/* Mobile Header (Visible only on mobile) */}
+          <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-zinc-200 bg-white shrink-0 z-20">
+             <div className="flex items-center gap-2 font-bold text-slate-800">
+                <BookOpen size={18} className="text-violet-600"/>
+                <span>{t(lang, 'recommendations.title')}</span>
+             </div>
+             <button 
+                onClick={onClose}
+                className="p-2 -mr-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"
+             >
+                <X size={24} />
+             </button>
+          </div>
+
+          {/* Desktop Sidebar Header */}
           <div className="p-6 border-b border-zinc-200 hidden md:block">
             <div className="flex items-center gap-2 text-slate-800 font-bold">
               <BookOpen className="text-violet-600" size={20} />
               <span>{t(lang, 'recommendations.title')}</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">Choose a framework for your team</p>
+            <p className="text-xs text-slate-500 mt-1">
+               {lang === 'es' ? 'Elige un marco de trabajo' : 'Choose a framework'}
+            </p>
           </div>
           
-          <div className="flex md:flex-col p-2 gap-1 w-full">
+          {/* Tabs Container */}
+          <div className="flex md:flex-col p-2 gap-1 w-full overflow-x-auto md:overflow-visible bg-zinc-50 border-b md:border-b-0 border-zinc-200 scrollbar-hide shrink-0 z-10">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as TabType)}
-                className={`flex items-center gap-3 p-3 rounded-xl transition-all text-sm font-semibold w-full whitespace-nowrap md:whitespace-normal
+                className={`flex items-center gap-3 p-3 rounded-xl transition-all text-sm font-semibold whitespace-nowrap md:whitespace-normal flex-shrink-0 md:w-full select-none
                   ${activeTab === tab.id 
                     ? 'bg-white shadow-md text-slate-900 ring-1 ring-zinc-200' 
                     : 'text-slate-500 hover:bg-zinc-100 hover:text-slate-700'
                   }`}
               >
-                <div className={`p-1.5 rounded-lg ${activeTab === tab.id ? `${tab.bg}/10` : 'bg-zinc-100'}`}>
+                <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === tab.id ? `${tab.bg}/10` : 'bg-zinc-100'}`}>
                   <tab.icon size={16} className={activeTab === tab.id ? tab.color : 'text-zinc-400'} />
                 </div>
                 {tab.label}
@@ -226,16 +418,18 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOp
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white relative">
+        <div className="flex-1 flex flex-col min-w-0 bg-white relative h-full">
+          
+          {/* Desktop Close Button (Hidden on Mobile) */}
           <button 
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors z-10"
+            className="hidden md:block absolute top-4 right-4 p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors z-10"
           >
             <X size={20} />
           </button>
 
-          <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
-            <div className="max-w-3xl mx-auto pb-10">
+          <div className="flex-1 overflow-y-auto p-5 md:p-10 custom-scrollbar pb-24 md:pb-10">
+            <div className="max-w-3xl mx-auto">
               
               <div className="mb-8">
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 ${tabs.find(t => t.id === activeTab)?.bg} bg-opacity-10 ${tabs.find(t => t.id === activeTab)?.color}`}>
@@ -249,82 +443,36 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({ isOp
                 </p>
               </div>
 
-              {activeTab === 'mindset' ? (
-                /* Specialized Layout for Mindset Tab */
-                <div className="space-y-10">
-                  {/* Pillars Section */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {currentContent.pillars?.map((pillar, idx) => (
-                      <div key={idx} className="bg-zinc-50 rounded-2xl p-6 border border-zinc-100">
-                        <div className="flex items-center gap-3 mb-4">
-                          <pillar.icon className={pillar.color} size={24} />
-                          <h3 className="font-bold text-slate-900">{pillar.title}</h3>
+              {/* Sections Layout */}
+              <div className="space-y-8">
+                {currentContent.sections?.map((section, idx) => (
+                  <div key={idx} className={`rounded-2xl border overflow-hidden ${section.isWarning ? 'bg-red-50 border-red-100' : 'bg-zinc-50 border-zinc-100'}`}>
+                    <div className={`px-6 py-4 border-b flex items-center gap-3 ${section.isWarning ? 'border-red-100' : 'border-zinc-200/50'}`}>
+                      {section.icon && (
+                        <div className={`p-2 rounded-lg bg-white shadow-sm shrink-0 ${section.color}`}>
+                           <section.icon size={18} />
                         </div>
-                        <ul className="space-y-4">
-                          {pillar.items.map((item, i) => (
-                            <li key={i}>
-                              <p className="font-semibold text-sm text-slate-800 mb-1">{item.title}</p>
-                              <p className="text-xs text-slate-500 leading-relaxed">{item.text}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Cheat Sheet Table */}
-                  <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
-                    <div className="bg-zinc-50 border-b border-zinc-200 p-4">
-                      <h3 className="font-bold text-slate-800 text-center uppercase tracking-widest text-xs">Cheat Sheet</h3>
+                      )}
+                      <h3 className={`font-bold text-lg ${section.isWarning ? 'text-red-800' : 'text-slate-800'}`}>
+                        {section.title}
+                      </h3>
                     </div>
-                    <div className="grid grid-cols-2 divide-x divide-zinc-100">
-                      <div className="p-0">
-                         <div className="bg-blue-50/50 p-2 text-center border-b border-blue-50">
-                           <span className="text-xs font-bold text-blue-700">FEEDBACK GIVER</span>
+                    
+                    <div className="p-6 grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+                       {section.items.map((item, i) => (
+                         <div key={i} className={`p-4 rounded-xl bg-white border shadow-sm transition-all hover:shadow-md ${section.isWarning ? 'border-red-100 hover:border-red-200' : 'border-zinc-100 hover:border-violet-100'} h-full`}>
+                            <h4 className={`font-bold text-sm mb-1.5 ${section.isWarning ? 'text-red-700' : 'text-slate-900'}`}>
+                              {item.title}
+                            </h4>
+                            <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
+                              {item.desc}
+                            </p>
                          </div>
-                         <ul className="p-4 space-y-3">
-                           {currentContent.cheatSheet?.giver.map((item, i) => (
-                             <li key={i} className="flex gap-2 text-sm text-slate-600">
-                               <CheckCircle2 size={16} className="text-blue-500 shrink-0 mt-0.5" />
-                               <span>{item}</span>
-                             </li>
-                           ))}
-                         </ul>
-                      </div>
-                      <div className="p-0">
-                         <div className="bg-emerald-50/50 p-2 text-center border-b border-emerald-50">
-                           <span className="text-xs font-bold text-emerald-700">FEEDBACK RECEIVER</span>
-                         </div>
-                         <ul className="p-4 space-y-3">
-                           {currentContent.cheatSheet?.receiver.map((item, i) => (
-                             <li key={i} className="flex gap-2 text-sm text-slate-600">
-                               <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
-                               <span>{item}</span>
-                             </li>
-                           ))}
-                         </ul>
-                      </div>
+                       ))}
                     </div>
                   </div>
-                </div>
-              ) : (
-                /* Standard Layout for other tabs */
-                <div className="grid gap-6">
-                  {currentContent.rules?.map((rule, idx) => (
-                    <div key={idx} className="flex gap-4 p-5 rounded-2xl bg-zinc-50 border border-zinc-100 hover:border-violet-100 hover:shadow-md transition-all group">
-                      <div className="flex-shrink-0 w-10 h-10 bg-white rounded-full flex items-center justify-center font-bold text-slate-300 shadow-sm border border-zinc-100 group-hover:text-violet-500 group-hover:border-violet-200 transition-colors">
-                        {idx + 1}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 mb-1">{rule.title}</h3>
-                        <p className="text-slate-600 leading-relaxed text-sm">
-                          {rule.desc}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                ))}
+              </div>
 
             </div>
           </div>
