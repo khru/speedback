@@ -236,11 +236,12 @@ function App() {
     setLang(prev => prev === 'en' ? 'es' : 'en');
   };
 
-  // Pre-load check to avoid flashing empty state before localStorage read
+  // Pre-load check: visually mimic the HTML loader to prevent flash
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
-        <Loader2 className="animate-spin text-violet-600 w-8 h-8" />
+      <div className="fixed inset-0 bg-[#f8fafc] flex flex-col items-center justify-center z-50">
+        <Zap size={48} className="text-violet-600 animate-pulse fill-current" />
+        <div className="mt-4 w-6 h-6 border-2 border-zinc-200 border-t-violet-600 rounded-full animate-spin"></div>
       </div>
     );
   }
