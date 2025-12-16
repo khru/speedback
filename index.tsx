@@ -8,8 +8,17 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+
+try {
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+} catch (e) {
+  console.error("Mount Error:", e);
+  rootElement.innerHTML = `<div style="padding: 20px; text-align: center; color: #e11d48;">
+    <h2>Something went wrong loading the app.</h2>
+    <p>Please try refreshing the page.</p>
+  </div>`;
+}

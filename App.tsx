@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Menu, Zap, Globe, BookOpen, FileText, Table2, X, Loader2, Share2, Check, Info } from 'lucide-react';
+import { Sparkles, Menu, Zap, Globe, BookOpen, FileText, Table2, X, Loader2, Share2, Check, Info, WifiOff } from 'lucide-react';
 
 import { MemberInput } from './components/MemberInput';
 import { MemberList } from './components/MemberList';
@@ -42,6 +42,7 @@ function App() {
   const [soundMode, setSoundMode] = useState<SoundMode>('all');
   const [isLoaded, setIsLoaded] = useState(false);
   const [showCopiedToast, setShowCopiedToast] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   
   // UI State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -50,6 +51,12 @@ function App() {
 
   // Initialization Logic: URL Params > LocalStorage
   useEffect(() => {
+    // Online Status Listeners
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     const params = new URLSearchParams(window.location.search);
     const urlMembers = params.get('members');
 
@@ -98,6 +105,11 @@ function App() {
     }
     // Small delay to ensure state is settled before allowing writes
     setTimeout(() => setIsLoaded(true), 50);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   // Save to local storage on change
@@ -275,6 +287,7 @@ function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+           {!isOnline && <WifiOff size={16} className="text-rose-400" />}
            {members.length > 0 && (
              <button
                onClick={handleShare}
@@ -346,10 +359,16 @@ function App() {
         
         {/* Desktop Header */}
         <header className="hidden md:flex flex-shrink-0 h-20 px-8 border-b border-zinc-200 bg-white/80 backdrop-blur-md items-center justify-between z-20 sticky top-0">
-           <div>
+           <div className="flex items-center gap-4">
              <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
                Session
              </h2>
+             {!isOnline && (
+               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-100 animate-in fade-in">
+                 <WifiOff size={14} />
+                 <span className="text-xs font-bold">Offline</span>
+               </div>
+             )}
            </div>
 
            <div className="flex items-center gap-3">
