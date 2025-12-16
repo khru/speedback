@@ -23,8 +23,9 @@ export const TRANSLATIONS = {
       exitRoom: "Exit Room",
       language: "Language",
       install: "Install App",
-      share: "Share Room",
-      linkCopied: "Link copied to clipboard!"
+      share: "Share List Link",
+      shareHint: "Share setup only. Session progress is local.",
+      linkCopied: "Link copied! (Note: Progress is not shared)"
     },
     room: {
       title: "Create Feedback Room",
@@ -103,8 +104,9 @@ export const TRANSLATIONS = {
       exitRoom: "Salir de Sala",
       language: "Idioma",
       install: "Instalar App",
-      share: "Compartir Sala",
-      linkCopied: "¡Enlace copiado al portapapeles!"
+      share: "Copiar Enlace de Lista",
+      shareHint: "Solo comparte la lista. El progreso es local.",
+      linkCopied: "¡Copiado! (El progreso no se comparte)"
     },
     room: {
       title: "Crear Sala de Feedback",
